@@ -1,4 +1,4 @@
-export type Category = "feeding" | "sleep" | "diaper" | "bath" | "other";
+export type Category = "feeding" | "sleep" | "diaper" | "bath" | "medication" | "other";
 
 export interface VoiceRecord {
   id: string;
@@ -13,11 +13,12 @@ export const CATEGORY_META: Record<
   Category,
   { label: string; emoji: string; color: string; bg: string }
 > = {
-  feeding: { label: "수유", emoji: "🍼", color: "#f97316", bg: "#fff7ed" },
-  sleep:   { label: "수면", emoji: "💤", color: "#6366f1", bg: "#eef2ff" },
-  diaper:  { label: "기저귀", emoji: "🩲", color: "#06b6d4", bg: "#ecfeff" },
-  bath:    { label: "목욕", emoji: "🛁", color: "#3b82f6", bg: "#eff6ff" },
-  other:   { label: "기타", emoji: "📝", color: "#6b7280", bg: "#f9fafb" },
+  feeding:    { label: "수유", emoji: "🍼", color: "#f97316", bg: "#fff7ed" },
+  sleep:      { label: "수면", emoji: "💤", color: "#6366f1", bg: "#eef2ff" },
+  diaper:     { label: "기저귀", emoji: "🩲", color: "#06b6d4", bg: "#ecfeff" },
+  bath:       { label: "목욕", emoji: "🛁", color: "#3b82f6", bg: "#eff6ff" },
+  medication: { label: "투약", emoji: "💊", color: "#10b981", bg: "#ecfdf5" },
+  other:      { label: "기타", emoji: "📝", color: "#6b7280", bg: "#f9fafb" },
 };
 
 const STORAGE_KEY = "voice-records";
@@ -76,5 +77,6 @@ export function detectCategory(text: string): Category {
   if (/잠|수면|재웠|깼|잤/.test(t)) return "sleep";
   if (/기저귀|응가|쉬|소변|대변/.test(t)) return "diaper";
   if (/목욕|씻/.test(t)) return "bath";
+  if (/투약|약|복용|먹였|시럽|해열|진통|항생/.test(t)) return "medication";
   return "other";
 }

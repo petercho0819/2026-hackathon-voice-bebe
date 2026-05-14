@@ -17,6 +17,7 @@ interface Child {
   birthDate: string;
   weight: string;
   height: string;
+  twinGroupId?: string;
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -73,7 +74,14 @@ function getLastRecord(records: VoiceRecord[], childId: string, category: Catego
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] ?? null;
 }
 
-const ALL_CATEGORIES: Category[] = ["feeding", "sleep", "diaper", "bath", "other"];
+const ALL_CATEGORIES: Category[] = ["feeding", "sleep", "diaper", "bath", "medication", "other"];
+const INSTANT_CATS = new Set<Category>(["diaper", "medication"]);
+
+function plusOneMinute(iso: string): string {
+  const d = new Date(iso);
+  d.setMinutes(d.getMinutes() + 1);
+  return d.toISOString();
+}
 
 // ── 아이 현황 카드 ────────────────────────────────────────────
 
@@ -115,10 +123,13 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
           {emoji}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{child.name}</span>
             {child.nicknames.length > 0 && (
               <span style={{ fontSize: 12, color: "#9ca3af" }}>({child.nicknames[0]})</span>
+            )}
+            {child.twinGroupId && (
+              <span style={{ fontSize: 11, color: "#8b5cf6", background: "#f5f3ff", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>쌍둥이</span>
             )}
           </div>
           <span style={{ fontSize: 12, color: "#9ca3af" }}>만 {age}세 · {child.gender === "female" ? "여아" : "남아"}</span>
@@ -277,17 +288,24 @@ function RecordingArea({
             />
           </div>
 
-          {/* 시작 / 종료 시간 */}
-          <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label style={DT_LABEL}>시작 시간</label>
+          {/* 시간 */}
+          {INSTANT_CATS.has(selectedCategory) ? (
+            <div>
+              <label style={DT_LABEL}>시간</label>
               <input type="time" value={startTime} onChange={(e) => onStartTimeChange(e.target.value)} style={DT_INPUT} />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={DT_LABEL}>종료 시간</label>
-              <input type="time" value={endTime} onChange={(e) => onEndTimeChange(e.target.value)} style={DT_INPUT} />
+          ) : (
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={DT_LABEL}>시작 시간</label>
+                <input type="time" value={startTime} onChange={(e) => onStartTimeChange(e.target.value)} style={DT_INPUT} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={DT_LABEL}>종료 시간</label>
+                <input type="time" value={endTime} onChange={(e) => onEndTimeChange(e.target.value)} style={DT_INPUT} />
+              </div>
             </div>
-          </div>
+          )}
 
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {ALL_CATEGORIES.map((cat) => {
@@ -317,7 +335,7 @@ function RecordingArea({
               <option value="">아이 선택 (선택사항)</option>
               {children.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}
+                  {c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}{c.twinGroupId ? " · 쌍둥이" : ""}
                 </option>
               ))}
             </select>
@@ -349,12 +367,15 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
   const [memo, setMemo]           = useState("");
   const [saved, setSaved]         = useState(false);
 
+  const isInstant = INSTANT_CATS.has(category);
+
   const handleSave = () => {
+    const ts = hhmmToISO(startTime);
     saveRecord({
       id: crypto.randomUUID(),
       childId: childId || null,
-      timestamp: hhmmToISO(startTime),
-      endTime: hhmmToISO(endTime),
+      timestamp: ts,
+      endTime: isInstant ? plusOneMinute(ts) : hhmmToISO(endTime),
       transcript: memo,
       category,
     });
@@ -397,17 +418,24 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
         </div>
       </div>
 
-      {/* 시작 / 종료 시간 */}
-      <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1 }}>
-          <label style={DT_LABEL}>시작 시간</label>
+      {/* 시간 */}
+      {isInstant ? (
+        <div>
+          <label style={DT_LABEL}>시간</label>
           <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={DT_INPUT} />
         </div>
-        <div style={{ flex: 1 }}>
-          <label style={DT_LABEL}>종료 시간</label>
-          <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={DT_INPUT} />
+      ) : (
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <label style={DT_LABEL}>시작 시간</label>
+            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={DT_INPUT} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={DT_LABEL}>종료 시간</label>
+            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={DT_INPUT} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 아이 선택 */}
       {kids.length > 0 && (
@@ -415,7 +443,7 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
           style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 13, color: "#374151", background: "#fff", outline: "none" }}>
           <option value="">아이 선택 (선택사항)</option>
           {kids.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}</option>
+            <option key={c.id} value={c.id}>{c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}{c.twinGroupId ? " · 쌍둥이" : ""}</option>
           ))}
         </select>
       )}
@@ -511,7 +539,7 @@ export default function RecordingTab() {
       if (data.error) throw new Error(data.error);
       const text: string = data.text ?? "";
       setTranscript(text);
-      const VALID = new Set(["feeding", "sleep", "diaper", "bath", "other"]);
+      const VALID = new Set(["feeding", "sleep", "diaper", "bath", "medication", "other"]);
       const cat: Category = VALID.has(data.category) ? (data.category as Category) : detectCategory(text);
       setDetectedCategory(cat);
       setSelectedCategory(cat);
@@ -530,11 +558,12 @@ export default function RecordingTab() {
 
   const handleSave = () => {
     const now = new Date().toISOString();
+    const ts = startTime ? hhmmToISO(startTime) : now;
     saveRecord({
       id: crypto.randomUUID(),
       childId: selectedChildId || null,
-      timestamp: startTime ? hhmmToISO(startTime) : now,
-      endTime: endTime ? hhmmToISO(endTime) : now,
+      timestamp: ts,
+      endTime: INSTANT_CATS.has(selectedCategory) ? plusOneMinute(ts) : (endTime ? hhmmToISO(endTime) : now),
       transcript,
       category: selectedCategory,
     });
