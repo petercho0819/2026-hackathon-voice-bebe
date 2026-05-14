@@ -15,9 +15,10 @@ interface Child {
 interface HealthRecord {
   id: string;
   childId: string;
-  date: string;    // YYYY-MM-DD
-  height: string;  // cm
-  weight: string;  // kg
+  date: string;             // YYYY-MM-DD
+  height: string;           // cm
+  weight: string;           // kg
+  headCircumference: string; // cm
 }
 
 // ── 스토리지 ──────────────────────────────────────────────────
@@ -32,7 +33,11 @@ function loadChildren(): Child[] {
 function loadHealthRecords(): HealthRecord[] {
   try {
     const raw = localStorage.getItem("health-records");
-    return raw ? (JSON.parse(raw) as HealthRecord[]) : [];
+    if (!raw) return [];
+    return (JSON.parse(raw) as HealthRecord[]).map((r) => ({
+      ...r,
+      headCircumference: r.headCircumference ?? "",
+    }));
   } catch { return []; }
 }
 
@@ -76,11 +81,12 @@ function HealthRecordModal({
   onSave: (data: Omit<HealthRecord, "id" | "childId">) => void;
   onClose: () => void;
 }) {
-  const [date, setDate]     = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
-  const [height, setHeight] = useState(initial?.height ?? "");
-  const [weight, setWeight] = useState(initial?.weight ?? "");
+  const [date, setDate]                   = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
+  const [height, setHeight]               = useState(initial?.height ?? "");
+  const [weight, setWeight]               = useState(initial?.weight ?? "");
+  const [headCircumference, setHeadCircumference] = useState(initial?.headCircumference ?? "");
 
-  const canSubmit = date && (height || weight);
+  const canSubmit = date && (height || weight || headCircumference);
 
   return (
     <>
@@ -119,13 +125,19 @@ function HealthRecordModal({
             </div>
           </div>
 
+          <div>
+            <label style={LABEL}>머리 둘레 (cm)</label>
+            <input type="number" value={headCircumference} onChange={(e) => setHeadCircumference(e.target.value)}
+              placeholder="34.0" min={20} max={70} step={0.1} style={FIELD} />
+          </div>
+
           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
             <button onClick={onClose} style={{
               flex: 1, padding: "13px 0", borderRadius: 10,
               border: "1px solid #e5e7eb", background: "#fff",
               fontSize: 15, cursor: "pointer", color: "#374151",
             }}>취소</button>
-            <button onClick={() => canSubmit && onSave({ date, height, weight })} disabled={!canSubmit} style={{
+            <button onClick={() => canSubmit && onSave({ date, height, weight, headCircumference })} disabled={!canSubmit} style={{
               flex: 2, padding: "13px 0", borderRadius: 10, border: "none",
               background: canSubmit ? "#3880ff" : "#d1d5db",
               fontSize: 15, fontWeight: 700, cursor: canSubmit ? "pointer" : "default", color: "#fff",
@@ -176,7 +188,7 @@ function RecordCard({
           <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>키</span>
           {record.height ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
-              <span style={{ fontSize: 26, fontWeight: 800, color: "#3b82f6" }}>{record.height}</span>
+              <span style={{ fontSize: 24, fontWeight: 800, color: "#3b82f6" }}>{record.height}</span>
               <span style={{ fontSize: 12, color: "#9ca3af" }}>cm</span>
             </div>
           ) : (
@@ -190,8 +202,22 @@ function RecordCard({
           <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>몸무게</span>
           {record.weight ? (
             <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
-              <span style={{ fontSize: 26, fontWeight: 800, color: "#f97316" }}>{record.weight}</span>
+              <span style={{ fontSize: 24, fontWeight: 800, color: "#f97316" }}>{record.weight}</span>
               <span style={{ fontSize: 12, color: "#9ca3af" }}>kg</span>
+            </div>
+          ) : (
+            <span style={{ fontSize: 20, color: "#d1d5db", fontWeight: 700 }}>—</span>
+          )}
+        </div>
+
+        <div style={{ width: 1, background: "#f3f4f6", margin: "0 8px" }} />
+
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>머리 둘레</span>
+          {record.headCircumference ? (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+              <span style={{ fontSize: 24, fontWeight: 800, color: "#10b981" }}>{record.headCircumference}</span>
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>cm</span>
             </div>
           ) : (
             <span style={{ fontSize: 20, color: "#d1d5db", fontWeight: 700 }}>—</span>
@@ -209,15 +235,23 @@ const CP = { top: 20, right: 16, bottom: 32, left: 42 };
 const PW = CW - CP.left - CP.right;
 const PH = CH - CP.top - CP.bottom;
 
-function GrowthChart({ records }: { records: HealthRecord[] }) {
-  const [metric, setMetric] = useState<"height" | "weight">("height");
+const METRIC_META = {
+  height:           { label: "키",      unit: "cm", color: "#3b82f6" },
+  weight:           { label: "몸무게",  unit: "kg", color: "#f97316" },
+  headCircumference:{ label: "머리 둘레", unit: "cm", color: "#10b981" },
+} as const;
 
-  const color = metric === "height" ? "#3b82f6" : "#f97316";
+type Metric = keyof typeof METRIC_META;
+
+function GrowthChart({ records }: { records: HealthRecord[] }) {
+  const [metric, setMetric] = useState<Metric>("height");
+
+  const { color, unit } = METRIC_META[metric];
 
   const points = [...records]
     .sort((a, b) => a.date.localeCompare(b.date))
     .reduce<{ date: string; value: number }[]>((acc, r) => {
-      const raw = metric === "height" ? r.height : r.weight;
+      const raw = r[metric];
       const v = parseFloat(raw);
       if (raw && !isNaN(v) && v > 0) acc.push({ date: r.date, value: v });
       return acc;
@@ -250,7 +284,7 @@ function GrowthChart({ records }: { records: HealthRecord[] }) {
       <div style={{ padding: "12px 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>성장 그래프</span>
         <div style={{ display: "flex", background: "#f3f4f6", borderRadius: 8, padding: 2 }}>
-          {(["height", "weight"] as const).map((m) => (
+          {(Object.keys(METRIC_META) as Metric[]).map((m) => (
             <button
               key={m}
               onClick={() => setMetric(m)}
@@ -258,11 +292,11 @@ function GrowthChart({ records }: { records: HealthRecord[] }) {
                 padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer",
                 fontSize: 12, fontWeight: 600, transition: "all 0.15s",
                 background: metric === m ? "#fff" : "transparent",
-                color: metric === m ? (m === "height" ? "#3b82f6" : "#f97316") : "#9ca3af",
+                color: metric === m ? METRIC_META[m].color : "#9ca3af",
                 boxShadow: metric === m ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
               }}
             >
-              {m === "height" ? "키" : "몸무게"}
+              {METRIC_META[m].label}
             </button>
           ))}
         </div>
@@ -325,7 +359,7 @@ function GrowthChart({ records }: { records: HealthRecord[] }) {
           </svg>
 
           <div style={{ padding: "0 16px 12px", textAlign: "right" }}>
-            <span style={{ fontSize: 10, color: "#9ca3af" }}>단위: {metric === "height" ? "cm" : "kg"}</span>
+            <span style={{ fontSize: 10, color: "#9ca3af" }}>단위: {unit}</span>
           </div>
         </>
       )}
