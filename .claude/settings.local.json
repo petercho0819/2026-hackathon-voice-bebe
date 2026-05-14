@@ -1,1 +1,16 @@
-{}
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(xargs kill -9)",
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(curl -s http://localhost:3060)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pkill -f \"next-server\")",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(git *)"
+    ]
+  }
+}

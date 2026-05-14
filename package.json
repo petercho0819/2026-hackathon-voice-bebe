@@ -9,7 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ionic/core": "^8.8.7",
+    "@ionic/react": "^8.8.7",
+    "ionicons": "^8.0.13",
     "next": "16.2.6",
+    "openai": "^6.37.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
