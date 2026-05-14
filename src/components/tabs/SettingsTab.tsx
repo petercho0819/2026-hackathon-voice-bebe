@@ -10,6 +10,7 @@ interface Child {
   birthDate: string; // YYYY-MM-DD
   weight: string;    // kg
   height: string;    // cm
+  twinGroupId?: string;
 }
 
 function calcAge(birthDate: string) {
@@ -56,12 +57,15 @@ function ChildCard({ child, onEdit, onDelete }: { child: Child; onEdit: () => vo
           {emoji}
         </div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             {child.name}
             {child.nicknames.length > 0 && (
-              <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 6 }}>
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>
                 ({child.nicknames.join(" · ")})
               </span>
+            )}
+            {child.twinGroupId && (
+              <span style={{ fontSize: 11, color: "#8b5cf6", background: "#f5f3ff", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>쌍둥이</span>
             )}
           </div>
           <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
@@ -89,9 +93,10 @@ const LABEL: React.CSSProperties = {
   fontSize: 12, color: "#6b7280", fontWeight: 600, marginBottom: 4, display: "block",
 };
 
-function ChildModal({ initial, onSave, onClose }: {
+function ChildModal({ initial, existingChildren, onSave, onClose }: {
   initial?: Child;
-  onSave: (child: Omit<Child, "id">) => void;
+  existingChildren: Child[];
+  onSave: (child: Omit<Child, "id" | "twinGroupId">, twinSiblingId: string | null) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -100,6 +105,12 @@ function ChildModal({ initial, onSave, onClose }: {
   const [birthDate, setBirthDate] = useState(initial?.birthDate ?? "");
   const [weight, setWeight] = useState(initial?.weight ?? "");
   const [height, setHeight] = useState(initial?.height ?? "");
+
+  const currentTwinSibling = initial?.twinGroupId
+    ? existingChildren.find((c) => c.twinGroupId === initial.twinGroupId) ?? null
+    : null;
+  const [isTwin, setIsTwin] = useState(!!initial?.twinGroupId);
+  const [twinSiblingId, setTwinSiblingId] = useState<string>(currentTwinSibling?.id ?? "");
 
   const canSubmit = name.trim() && birthDate;
 
@@ -112,7 +123,10 @@ function ChildModal({ initial, onSave, onClose }: {
   const handleSubmit = () => {
     if (!canSubmit) return;
     const filtered = nicknames.map((n) => n.trim()).filter(Boolean);
-    onSave({ name: name.trim(), nicknames: filtered, gender, birthDate, weight, height });
+    onSave(
+      { name: name.trim(), nicknames: filtered, gender, birthDate, weight, height },
+      isTwin && twinSiblingId ? twinSiblingId : null,
+    );
   };
 
   return (
@@ -223,6 +237,53 @@ function ChildModal({ initial, onSave, onClose }: {
             </div>
           </div>
 
+          {/* 쌍둥이 */}
+          <div style={{ background: "#f9fafb", borderRadius: 12, padding: "14px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>쌍둥이</span>
+                <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 6 }}>다른 아이와 쌍둥이 관계 설정</span>
+              </div>
+              <button
+                onClick={() => { setIsTwin((v) => !v); setTwinSiblingId(""); }}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                  background: isTwin ? "#8b5cf6" : "#d1d5db",
+                  position: "relative", transition: "background 0.2s", flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: "absolute", top: 2, width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                  transition: "left 0.2s", left: isTwin ? 22 : 2,
+                }} />
+              </button>
+            </div>
+
+            {isTwin && (
+              existingChildren.length > 0 ? (
+                <div>
+                  <label style={{ ...LABEL, color: "#8b5cf6" }}>쌍둥이 형제/자매 선택</label>
+                  <select
+                    value={twinSiblingId}
+                    onChange={(e) => setTwinSiblingId(e.target.value)}
+                    style={{ ...FIELD, border: "1.5px solid #8b5cf6" }}
+                  >
+                    <option value="">선택하세요</option>
+                    {existingChildren.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, color: "#9ca3af" }}>
+                  쌍둥이 형제/자매를 먼저 등록한 후 연결할 수 있습니다.
+                </p>
+              )
+            )}
+          </div>
+
           {/* 버튼 */}
           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
             <button onClick={onClose} style={{
@@ -235,6 +296,61 @@ function ChildModal({ initial, onSave, onClose }: {
               fontSize: 15, fontWeight: 700, cursor: canSubmit ? "pointer" : "default", color: "#fff",
             }}>{initial ? "저장하기" : "등록하기"}</button>
           </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ChildDeleteModal({ child, onConfirm, onClose }: {
+  child: Child;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const emoji = child.gender === "female" ? "👧" : "👦";
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }} />
+      <div style={{
+        position: "fixed", left: "50%", top: "50%",
+        transform: "translate(-50%, -50%)",
+        background: "#fff", borderRadius: 20,
+        zIndex: 201, width: "calc(100% - 48px)", maxWidth: 320,
+        padding: "28px 20px 20px",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+      }}>
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>
+          🗑️
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700, color: "#111827" }}>아이를 삭제할까요?</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <span style={{ fontSize: 18 }}>{emoji}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#374151" }}>{child.name}</span>
+            {child.twinGroupId && (
+              <span style={{ fontSize: 11, color: "#8b5cf6", background: "#f5f3ff", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>쌍둥이</span>
+            )}
+          </div>
+          {child.nicknames.length > 0 && (
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#9ca3af" }}>
+              {child.nicknames.join(" · ")}
+            </p>
+          )}
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: "#9ca3af", textAlign: "center" }}>
+          삭제하면 이 아이의 모든 기록 연결이 해제됩니다
+        </p>
+        <div style={{ display: "flex", gap: 10, width: "100%", marginTop: 4 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "13px 0", borderRadius: 10,
+            border: "1px solid #e5e7eb", background: "#fff",
+            fontSize: 15, cursor: "pointer", color: "#374151", fontWeight: 600,
+          }}>취소</button>
+          <button onClick={onConfirm} style={{
+            flex: 1, padding: "13px 0", borderRadius: 10, border: "none",
+            background: "#ef4444", fontSize: 15, fontWeight: 700,
+            cursor: "pointer", color: "#fff",
+          }}>삭제</button>
         </div>
       </div>
     </>
@@ -322,6 +438,7 @@ function InviteCodeSection() {
 export default function SettingsTab() {
   const [children, setChildren] = useState<Child[]>([]);
   const [modalTarget, setModalTarget] = useState<Child | null | "new">(null);
+  const [deleteTarget, setDeleteTarget] = useState<Child | null>(null);
 
   useEffect(() => {
     try {
@@ -346,11 +463,37 @@ export default function SettingsTab() {
     localStorage.setItem("registered-children", JSON.stringify(updated));
   };
 
-  const handleSave = (data: Omit<Child, "id">) => {
+  const handleSave = (data: Omit<Child, "id" | "twinGroupId">, twinSiblingId: string | null) => {
     if (modalTarget === "new") {
-      saveChildren([...children, { id: crypto.randomUUID(), ...data }]);
+      const newId = crypto.randomUUID();
+      if (twinSiblingId) {
+        const groupId = children.find((c) => c.id === twinSiblingId)?.twinGroupId ?? crypto.randomUUID();
+        saveChildren([
+          ...children.map((c) => c.id === twinSiblingId ? { ...c, twinGroupId: groupId } : c),
+          { id: newId, ...data, twinGroupId: groupId },
+        ]);
+      } else {
+        saveChildren([...children, { id: newId, ...data }]);
+      }
     } else if (modalTarget) {
-      saveChildren(children.map((c) => c.id === modalTarget.id ? { ...modalTarget, ...data } : c));
+      const oldGroupId = modalTarget.twinGroupId;
+      if (twinSiblingId) {
+        const groupId = oldGroupId ?? children.find((c) => c.id === twinSiblingId)?.twinGroupId ?? crypto.randomUUID();
+        saveChildren(children.map((c) => {
+          if (c.id === modalTarget.id) return { ...modalTarget, ...data, twinGroupId: groupId };
+          if (c.id === twinSiblingId) return { ...c, twinGroupId: groupId };
+          // 이전 쌍둥이 파트너 연결 해제
+          if (oldGroupId && c.twinGroupId === oldGroupId) return { ...c, twinGroupId: undefined };
+          return c;
+        }));
+      } else {
+        // 쌍둥이 해제
+        saveChildren(children.map((c) => {
+          if (c.id === modalTarget.id) return { ...modalTarget, ...data, twinGroupId: undefined };
+          if (oldGroupId && c.twinGroupId === oldGroupId) return { ...c, twinGroupId: undefined };
+          return c;
+        }));
+      }
     }
     setModalTarget(null);
   };
@@ -379,7 +522,7 @@ export default function SettingsTab() {
           </div>
         ) : (
           children.map((child) => (
-            <ChildCard key={child.id} child={child} onEdit={() => setModalTarget(child)} onDelete={() => deleteChild(child.id)} />
+            <ChildCard key={child.id} child={child} onEdit={() => setModalTarget(child)} onDelete={() => setDeleteTarget(child)} />
           ))
         )}
 
@@ -401,8 +544,18 @@ export default function SettingsTab() {
       {modalTarget !== null && (
         <ChildModal
           initial={modalTarget === "new" ? undefined : modalTarget}
+          existingChildren={modalTarget === "new"
+            ? children
+            : children.filter((c) => c.id !== modalTarget.id)}
           onSave={handleSave}
           onClose={() => setModalTarget(null)}
+        />
+      )}
+      {deleteTarget && (
+        <ChildDeleteModal
+          child={deleteTarget}
+          onConfirm={() => { deleteChild(deleteTarget.id); setDeleteTarget(null); }}
+          onClose={() => setDeleteTarget(null)}
         />
       )}
     </div>
