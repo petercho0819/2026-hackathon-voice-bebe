@@ -2,18 +2,20 @@
 
 import { useState } from "react";
 import { IonIcon } from "@ionic/react";
-import { micOutline, happyOutline, timeOutline, settingsOutline } from "ionicons/icons";
+import { micOutline, happyOutline, timeOutline, leafOutline, settingsOutline } from "ionicons/icons";
 import RecordingTab from "@/components/tabs/RecordingTab";
 import StatusTab from "@/components/tabs/StatusTab";
 import TimelineTab from "@/components/tabs/TimelineTab";
+import GrowthTab from "@/components/tabs/GrowthTab";
 import SettingsTab from "@/components/tabs/SettingsTab";
 
-type Tab = "recording" | "status" | "timeline" | "settings";
+type Tab = "recording" | "status" | "timeline" | "growth" | "settings";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "recording", label: "녹음", icon: micOutline },
   { id: "status", label: "생활패턴", icon: happyOutline },
   { id: "timeline", label: "건강기록", icon: timeOutline },
+  { id: "growth", label: "성장기록", icon: leafOutline },
   { id: "settings", label: "설정", icon: settingsOutline },
 ];
 
@@ -38,6 +40,7 @@ export default function Home() {
         {activeTab === "recording" && <RecordingTab />}
         {activeTab === "status" && <StatusTab />}
         {activeTab === "timeline" && <TimelineTab />}
+        {activeTab === "growth" && <GrowthTab />}
         {activeTab === "settings" && <SettingsTab />}
       </div>
 
@@ -69,7 +72,7 @@ export default function Home() {
             }}
           >
             <IonIcon icon={icon} style={{ fontSize: 22 }} />
-            <span style={{ fontSize: 10, fontWeight: activeTab === id ? 700 : 400, lineHeight: 1 }}>
+            <span style={{ fontSize: 9, fontWeight: activeTab === id ? 700 : 400, lineHeight: 1 }}>
               {label}
             </span>
           </button>
