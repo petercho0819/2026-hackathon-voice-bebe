@@ -9,7 +9,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 
 // ── 타입 ─────────────────────────────────────────────────────
 
-type RecordStatus = "idle" | "recording" | "preview" | "transcribing" | "categorize";
+type RecordStatus = "idle" | "recording" | "transcribing" | "categorize";
 
 interface Child {
   id: string;
@@ -207,16 +207,16 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
 // DT_INPUT and DT_LABEL are computed per-component to support theming
 
 function RecordingArea({
-  status, audioUrl,
-  onStart, onStop, onReset, onTranscribe,
+  status,
+  onStart, onStop, onReset,
   transcript, onTranscriptChange, rawTranscript, error,
   startTime, onStartTimeChange, endTime, onEndTimeChange,
   detectedCategory, selectedCategory, onSelectCategory,
   children, selectedChildId, onSelectChild,
   saved, onSave,
 }: {
-  status: RecordStatus; audioUrl: string | null;
-  onStart: () => void; onStop: () => void; onReset: () => void; onTranscribe: () => void;
+  status: RecordStatus;
+  onStart: () => void; onStop: () => void; onReset: () => void;
   transcript: string; onTranscriptChange: (text: string) => void; rawTranscript: string; error: string;
   startTime: string; onStartTimeChange: (v: string) => void;
   endTime: string; onEndTimeChange: (v: string) => void;
@@ -237,7 +237,6 @@ function RecordingArea({
   };
 
   const isRecording   = status === "recording";
-  const isPreview     = status === "preview";
   const isTranscribing = status === "transcribing";
   const isCategorize  = status === "categorize";
 
@@ -248,15 +247,15 @@ function RecordingArea({
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         <button
           onClick={isRecording ? onStop : onStart}
-          disabled={isPreview || isTranscribing || isCategorize}
+          disabled={isTranscribing || isCategorize}
           style={{
             width: 100, height: 100, borderRadius: "50%", border: "none",
-            background: isRecording ? "#dc2626" : (isPreview || isTranscribing || isCategorize) ? "#d1d5db" : "#ef4444",
+            background: isRecording ? "#dc2626" : (isTranscribing || isCategorize) ? "#d1d5db" : "#ef4444",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: isRecording
               ? "0 0 0 10px rgba(220,38,38,0.12), 0 4px 18px rgba(239,68,68,0.45)"
               : "0 6px 20px rgba(239,68,68,0.35)",
-            cursor: (isPreview || isTranscribing || isCategorize) ? "default" : "pointer",
+            cursor: (isTranscribing || isCategorize) ? "default" : "pointer",
             transition: "background 0.2s, box-shadow 0.3s",
           }}
         >
@@ -265,7 +264,6 @@ function RecordingArea({
 
         <p style={{ color: theme.text3, fontSize: 14, margin: 0 }}>
           {isRecording    ? "녹음 중… 버튼을 눌러 완료"
-          : isPreview      ? "녹음 완료 — 아래에서 확인하세요"
           : isTranscribing ? "음성 인식 중…"
           : isCategorize   ? "카테고리를 선택하고 저장하세요"
           : "버튼을 눌러 녹음 시작"}
@@ -279,22 +277,6 @@ function RecordingArea({
           </div>
         )}
       </div>
-
-      {/* 미리 듣기 */}
-      {isPreview && audioUrl && (
-        <div style={{ width: "100%", background: theme.cardAlt, borderRadius: 16, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: theme.text2 }}>녹음된 파일 미리 듣기</p>
-          <audio src={audioUrl} controls style={{ width: "100%", borderRadius: 8 }} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onReset} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 13, cursor: "pointer", color: theme.text2 }}>
-              다시 녹음
-            </button>
-            <button onClick={onTranscribe} style={{ flex: 2, padding: "10px 0", borderRadius: 10, border: "none", background: "#3880ff", fontSize: 13, fontWeight: 700, cursor: "pointer", color: "#fff" }}>
-              음성 인식 시작
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 에러 */}
       {error && <p style={{ color: "#ef4444", fontSize: 13, margin: 0 }}>{error}</p>}
@@ -555,8 +537,6 @@ export default function RecordingTab() {
   const { theme } = useTheme();
   const [subTab, setSubTab]             = useState<"record" | "manual">("record");
   const [status, setStatus]             = useState<RecordStatus>("idle");
-  const [audioUrl, setAudioUrl]         = useState<string | null>(null);
-  const [audioBlobRef, setAudioBlobRef] = useState<{ blob: Blob; mimeType: string } | null>(null);
   const [transcript, setTranscript]     = useState("");
   const [rawTranscript, setRawTranscript] = useState("");
   const [error, setError]               = useState("");
@@ -571,18 +551,16 @@ export default function RecordingTab() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef        = useRef<Blob[]>([]);
+  const pendingBlobRef   = useRef<{ blob: Blob; mimeType: string } | null>(null);
 
   useEffect(() => {
     setRecords(loadRecords());
     setChildren(loadChildren());
   }, []);
 
-  useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl); }, [audioUrl]);
-
   const startRecording = async () => {
     setError(""); setTranscript(""); setSaved(false);
-    if (audioUrl) { URL.revokeObjectURL(audioUrl); setAudioUrl(null); }
-    setAudioBlobRef(null);
+    pendingBlobRef.current = null;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
@@ -592,9 +570,8 @@ export default function RecordingTab() {
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        setAudioUrl(URL.createObjectURL(blob));
-        setAudioBlobRef({ blob, mimeType });
-        setStatus("preview");
+        pendingBlobRef.current = { blob, mimeType };
+        transcribeBlob(blob, mimeType);
       };
       recorder.start();
       mediaRecorderRef.current = recorder;
@@ -606,9 +583,7 @@ export default function RecordingTab() {
 
   const stopRecording = () => { mediaRecorderRef.current?.stop(); mediaRecorderRef.current = null; };
 
-  const transcribe = async () => {
-    if (!audioBlobRef) return;
-    const { blob, mimeType } = audioBlobRef;
+  const transcribeBlob = async (blob: Blob, mimeType: string) => {
     const ext = mimeType.includes("webm") ? "webm" : "mp4";
     const form = new FormData();
     form.append("audio", new File([blob], `recording.${ext}`, { type: mimeType }));
@@ -652,8 +627,7 @@ export default function RecordingTab() {
     setSaved(true);
     setRecords(loadRecords());
     setTimeout(() => {
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null); setAudioBlobRef(null);
+      pendingBlobRef.current = null;
       setTranscript(""); setRawTranscript(""); setError(""); setSaved(false);
       setStartTime(""); setEndTime("");
       setStatus("idle");
@@ -661,8 +635,7 @@ export default function RecordingTab() {
   };
 
   const reset = () => {
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
-    setAudioUrl(null); setAudioBlobRef(null);
+    pendingBlobRef.current = null;
     setTranscript(""); setRawTranscript(""); setError(""); setSaved(false);
     setStartTime(""); setEndTime("");
     setStatus("idle");
@@ -690,8 +663,8 @@ export default function RecordingTab() {
         <div style={{ background: theme.card, borderRadius: 20, padding: "24px 16px 20px", boxShadow: `0 2px 12px ${theme.shadow}` }}>
           {subTab === "record" ? (
             <RecordingArea
-              status={status} audioUrl={audioUrl}
-              onStart={startRecording} onStop={stopRecording} onReset={reset} onTranscribe={transcribe}
+              status={status}
+              onStart={startRecording} onStop={stopRecording} onReset={reset}
               transcript={transcript} onTranscriptChange={setTranscript} rawTranscript={rawTranscript} error={error}
               startTime={startTime} onStartTimeChange={setStartTime}
               endTime={endTime} onEndTimeChange={setEndTime}

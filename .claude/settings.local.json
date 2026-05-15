@@ -10,7 +10,15 @@
       "Bash(pkill -f \"next-server\")",
       "Bash(npm install *)",
       "Bash(npx tsc *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(python3 *)",
+      "Bash(pip3 install *)",
+      "Bash(npx next *)",
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|rgba\\\\|rgb\\(\" /Users/youngseokcho/Documents/daekyo/ai-hackathon-2026/src/components/tabs/RecordingTab.tsx)",
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|rgba\\\\|rgb\\(\" /Users/youngseokcho/Documents/daekyo/ai-hackathon-2026/src/components/tabs/StatusTab.tsx)",
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|rgba\\\\|rgb\\(\" /Users/youngseokcho/Documents/daekyo/ai-hackathon-2026/src/components/tabs/TimelineTab.tsx)",
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|rgba\\\\|rgb\\(\" /Users/youngseokcho/Documents/daekyo/ai-hackathon-2026/src/components/tabs/GrowthTab.tsx)",
+      "Bash(npm list *)"
     ]
   }
 }
