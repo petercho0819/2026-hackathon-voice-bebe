@@ -248,28 +248,16 @@ function seedHealthRecords(children: ChildInfo[]): void {
     const totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
     const ref = child.gender === "female" ? femaleRef : maleRef;
 
-    // 등록된 실제 키/몸무게와 WHO 기준치의 차이를 오프셋으로 적용
-    const refAtCurrent = ref[Math.min(totalMonths, 12)] ?? ref[12];
-    const heightOffset = child.height ? parseFloat(child.height) - refAtCurrent[0] : 0;
-    const weightOffset = child.weight ? parseFloat(child.weight) - refAtCurrent[1] : 0;
-
-    // 매달 1회 측정 (최근 6개월치)
+    // 매달 1회 측정 (최근 6개월치) — WHO p50 기준치 + 미세 변동
     for (let m = Math.max(0, totalMonths - 5); m <= totalMonths; m++) {
       const measureDate = new Date(birth);
       measureDate.setMonth(measureDate.getMonth() + m);
       const dateStr = measureDate.toISOString().slice(0, 10);
 
       const base = ref[Math.min(m, 12)] ?? ref[12];
-      const isCurrent = m === totalMonths;
-
-      // 현재 시점은 등록값 그대로, 과거는 오프셋 적용 + 미세 변동
-      const height = isCurrent && child.height
-        ? child.height
-        : (base[0] + heightOffset + vary(0, 4) * 0.1).toFixed(1);
-      const weight = isCurrent && child.weight
-        ? child.weight
-        : (base[1] + weightOffset + vary(0, 4) * 0.1).toFixed(1);
-      const head = (base[2] + vary(0, 2) * 0.1).toFixed(1);
+      const height = (base[0] + vary(0, 4) * 0.1).toFixed(1);
+      const weight = (base[1] + vary(0, 4) * 0.1).toFixed(1);
+      const head   = (base[2] + vary(0, 2) * 0.1).toFixed(1);
 
       const caregiverId = m % 2 === 0 ? MOM_ID : DAD_ID;
       newRecords.push({ id: uuid(), childId: child.id, caregiverId, date: dateStr, height, weight, headCircumference: head });

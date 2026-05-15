@@ -86,7 +86,7 @@ export default function Home() {
         {activeTab === "status" && <StatusTab />}
         {activeTab === "timeline" && <TimelineTab />}
         {activeTab === "growth" && <GrowthTab />}
-        {activeTab === "settings" && <SettingsTab />}
+        {activeTab === "settings" && <SettingsTab onSeedComplete={() => setActiveTab("recording")} />}
       </div>
 
       {/* 응급챗 모달 — 마운트 유지, display로 숨김 */}
