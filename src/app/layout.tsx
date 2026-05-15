@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Hackathon 2026",
-  description: "AI Hackathon 2026",
+  title: "Voice bebe",
+  description: "voice bebe",
 };
 
 export default function RootLayout({
