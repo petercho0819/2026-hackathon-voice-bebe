@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { IonIcon } from "@ionic/react";
 import { closeOutline, paperPlaneOutline, warningOutline } from "ionicons/icons";
 import { useTheme } from "@/contexts/ThemeContext";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "model";
@@ -353,11 +354,14 @@ export default function EmergencyChat({ onClose, onExit }: { onClose: () => void
                 color: msg.role === "user" ? "#fff" : theme.text1,
                 fontSize: 13, lineHeight: 1.65,
                 boxShadow: `0 1px 4px ${theme.shadow}`,
-                whiteSpace: "pre-wrap",
                 wordBreak: "keep-all",
               }}>
                 {isTyping && i === messages.length - 1 ? (
                   <span style={{ letterSpacing: 2, opacity: 0.5 }}>●●●</span>
+                ) : msg.role === "model" ? (
+                  <div className="md-chat">
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  </div>
                 ) : (
                   msg.text
                 )}
@@ -501,6 +505,21 @@ export default function EmergencyChat({ onClose, onExit }: { onClose: () => void
           0%, 100% { opacity: 0.3; }
           50% { opacity: 1; }
         }
+        .md-chat p { margin: 0 0 6px; }
+        .md-chat p:last-child { margin-bottom: 0; }
+        .md-chat ul, .md-chat ol { margin: 4px 0 6px; padding-left: 18px; }
+        .md-chat li { margin-bottom: 3px; }
+        .md-chat strong { font-weight: 700; }
+        .md-chat code { background: rgba(0,0,0,0.08); border-radius: 4px; padding: 1px 5px; font-size: 12px; font-family: monospace; }
+        .md-chat pre { background: rgba(0,0,0,0.06); border-radius: 8px; padding: 8px 10px; overflow-x: auto; margin: 6px 0; }
+        .md-chat pre code { background: none; padding: 0; }
+        .md-chat h1, .md-chat h2, .md-chat h3 { margin: 6px 0 4px; font-weight: 700; }
+        .md-chat h1 { font-size: 15px; }
+        .md-chat h2 { font-size: 14px; }
+        .md-chat h3 { font-size: 13px; }
+        .md-chat hr { border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 8px 0; }
+        .md-chat a { color: #3880ff; text-decoration: underline; }
+        .md-chat blockquote { border-left: 3px solid rgba(0,0,0,0.15); margin: 4px 0; padding: 2px 8px; color: inherit; opacity: 0.8; }
       `}</style>
     </div>
   );
