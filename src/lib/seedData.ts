@@ -1,4 +1,5 @@
 import type { VoiceRecord } from "./records";
+import { ensureFixedCaregivers, setActiveCaregiverId } from "./caregivers";
 
 const MOM_ID = "caregiver-mom";
 const DAD_ID = "caregiver-dad";
@@ -247,6 +248,11 @@ function seedHealthRecords(children: ChildInfo[]): void {
     const totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
     const ref = child.gender === "female" ? femaleRef : maleRef;
 
+    // 등록된 실제 키/몸무게와 WHO 기준치의 차이를 오프셋으로 적용
+    const refAtCurrent = ref[Math.min(totalMonths, 12)] ?? ref[12];
+    const heightOffset = child.height ? parseFloat(child.height) - refAtCurrent[0] : 0;
+    const weightOffset = child.weight ? parseFloat(child.weight) - refAtCurrent[1] : 0;
+
     // 매달 1회 측정 (최근 6개월치)
     for (let m = Math.max(0, totalMonths - 5); m <= totalMonths; m++) {
       const measureDate = new Date(birth);
@@ -254,9 +260,16 @@ function seedHealthRecords(children: ChildInfo[]): void {
       const dateStr = measureDate.toISOString().slice(0, 10);
 
       const base = ref[Math.min(m, 12)] ?? ref[12];
-      const height = (base[0] + vary(0, 4) * 0.1).toFixed(1);
-      const weight = (base[1] + vary(0, 4) * 0.1).toFixed(1);
-      const head   = (base[2] + vary(0, 2) * 0.1).toFixed(1);
+      const isCurrent = m === totalMonths;
+
+      // 현재 시점은 등록값 그대로, 과거는 오프셋 적용 + 미세 변동
+      const height = isCurrent && child.height
+        ? child.height
+        : (base[0] + heightOffset + vary(0, 4) * 0.1).toFixed(1);
+      const weight = isCurrent && child.weight
+        ? child.weight
+        : (base[1] + weightOffset + vary(0, 4) * 0.1).toFixed(1);
+      const head = (base[2] + vary(0, 2) * 0.1).toFixed(1);
 
       const caregiverId = m % 2 === 0 ? MOM_ID : DAD_ID;
       newRecords.push({ id: uuid(), childId: child.id, caregiverId, date: dateStr, height, weight, headCircumference: head });
@@ -304,18 +317,73 @@ function seedDiaryRecords(children: ChildInfo[]): void {
   localStorage.setItem("diary-records", JSON.stringify(newRecords));
 }
 
+// ── 데모 아이 시드 ────────────────────────────────────────────
+
+const DEMO_TWIN_GROUP = "demo-twin-group-2026";
+
+interface RegisteredChild {
+  id: string; name: string; nicknames: string[];
+  gender: "male" | "female"; birthDate: string;
+  height: string; weight: string; twinGroupId?: string;
+}
+
+const DEMO_CHILDREN: RegisteredChild[] = [
+  {
+    id: "demo-child-seoa",
+    name: "이서아", nicknames: ["첫째"],
+    gender: "female", birthDate: "2025-02-01",
+    height: "48.4", weight: "3.32",
+  },
+  {
+    id: "demo-child-seoyun",
+    name: "이서윤", nicknames: ["서윤이", "유니"],
+    gender: "female", birthDate: "2026-02-14",
+    height: "45", weight: "2.85",
+    twinGroupId: DEMO_TWIN_GROUP,
+  },
+  {
+    id: "demo-child-seojun",
+    name: "이서준", nicknames: ["서준이", "막내", "쭈니"],
+    gender: "male", birthDate: "2026-02-14",
+    height: "46", weight: "2.9",
+    twinGroupId: DEMO_TWIN_GROUP,
+  },
+];
+
 // ── 메인 ─────────────────────────────────────────────────────
+
+function calcAgeMonths(birthDate?: string): number {
+  if (!birthDate) return 6;
+  const birth = new Date(birthDate);
+  const now = new Date();
+  return Math.max(0, (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth()));
+}
+
+function selectPlanner(child: ChildInfo): (dayIndex: number) => Ev[] {
+  const months = calcAgeMonths(child.birthDate);
+  if (months <= 2) return eventsThird;   // 신생아 (~2개월)
+  if (months <= 5) return eventsSecond;  // 영아 초기 (3~5개월)
+  return eventsFirst;                    // 영아 후기 (6개월~)
+}
 
 export function seedDemoData(): number {
   let children: ChildInfo[] = [];
-  try { children = JSON.parse(localStorage.getItem("registered-children") ?? "[]"); } catch { return 0; }
-  if (children.length === 0) return 0;
+  try { children = JSON.parse(localStorage.getItem("registered-children") ?? "[]"); } catch { children = []; }
 
-  const planners = [eventsFirst, eventsSecond, eventsThird];
+  // 등록된 아이가 없으면 데모 아이 자동 등록
+  if (children.length === 0) {
+    localStorage.setItem("registered-children", JSON.stringify(DEMO_CHILDREN));
+    children = DEMO_CHILDREN;
+  }
+
+  // 양육자 등록 및 현재 양육자 → 아빠(이해커톤)
+  ensureFixedCaregivers();
+  setActiveCaregiverId(DAD_ID);
+
   const records: VoiceRecord[] = [];
 
-  children.slice(0, 3).forEach((child, ci) => {
-    const planner = planners[ci] ?? planners[0];
+  children.slice(0, 3).forEach((child) => {
+    const planner = selectPlanner(child);
 
     for (let daysAgoN = 13; daysAgoN >= 0; daysAgoN--) {
       const dateStr = ago(daysAgoN);
