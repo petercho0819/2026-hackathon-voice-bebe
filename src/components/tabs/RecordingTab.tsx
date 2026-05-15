@@ -604,7 +604,7 @@ export default function RecordingTab() {
       setEndTime(nowStr);
       const kids = loadChildren();
       setChildren(kids);
-      setSelectedChildId(detectChildId(text, kids));
+      setSelectedChildId(detectChildId(data.transcript ?? text, kids));
       setStatus("categorize");
     } catch (e) {
       setError(e instanceof Error ? e.message : "인식에 실패했습니다.");
