@@ -4,6 +4,7 @@ import { IonIcon } from "@ionic/react";
 import { micOutline, stopOutline } from "ionicons/icons";
 import { useState, useRef, useEffect } from "react";
 import { Category, CATEGORY_META, VoiceRecord, detectCategory, saveRecord, loadRecords } from "@/lib/records";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // ── 타입 ─────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ function plusOneMinute(iso: string): string {
 // ── 아이 현황 카드 ────────────────────────────────────────────
 
 function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecord[] }) {
+  const { theme } = useTheme();
   const now = Date.now();
   const sleepRec  = getLastRecord(records, child.id, "sleep");
   const feedRec   = getLastRecord(records, child.id, "feeding");
@@ -116,7 +118,7 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
   ];
 
   return (
-    <div style={{ background: "#fff", borderRadius: 20, padding: "16px 16px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
+    <div style={{ background: theme.card, borderRadius: 20, padding: "16px 16px", boxShadow: `0 2px 12px ${theme.shadow}` }}>
       {/* 아이 프로필 헤더 */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
         <div style={{ width: 44, height: 44, borderRadius: "50%", background: genderBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
@@ -124,20 +126,20 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{child.name}</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: theme.text1 }}>{child.name}</span>
             {child.nicknames.length > 0 && (
-              <span style={{ fontSize: 12, color: "#9ca3af" }}>({child.nicknames[0]})</span>
+              <span style={{ fontSize: 12, color: theme.text4 }}>({child.nicknames[0]})</span>
             )}
             {child.twinGroupId && (
               <span style={{ fontSize: 11, color: "#8b5cf6", background: "#f5f3ff", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>쌍둥이</span>
             )}
           </div>
-          <span style={{ fontSize: 12, color: "#9ca3af" }}>만 {age}세 · {child.gender === "female" ? "여아" : "남아"}</span>
+          <span style={{ fontSize: 12, color: theme.text4 }}>만 {age}세 · {child.gender === "female" ? "여아" : "남아"}</span>
         </div>
       </div>
 
       {/* 구분선 */}
-      <div style={{ height: 1, background: "#f3f4f6", marginBottom: 12 }} />
+      <div style={{ height: 1, background: theme.borderLight, marginBottom: 12 }} />
 
       {/* 활동 현황 */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -146,19 +148,19 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
             <span style={{ fontSize: 16, width: 24, textAlign: "center", flexShrink: 0 }}>{icon}</span>
             {rec ? (
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 14, color: "#374151" }}>
+                <span style={{ fontSize: 14, color: theme.text2 }}>
                   {label}{" "}
                   <span style={{ fontWeight: 700, color: CATEGORY_META[category].color }}>
                     {formatElapsed(now - new Date(rec.timestamp).getTime())}
                   </span>
                   {" "}지났어요
                 </span>
-                <span style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 11, color: theme.text4, whiteSpace: "nowrap" }}>
                   마지막 시간 : {formatHHMM(rec.timestamp)}
                 </span>
               </div>
             ) : (
-              <span style={{ fontSize: 13, color: "#d1d5db" }}>기록 없음</span>
+              <span style={{ fontSize: 13, color: theme.text5 }}>기록 없음</span>
             )}
           </div>
         ))}
@@ -169,15 +171,7 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
 
 // ── 녹음 영역 ─────────────────────────────────────────────────
 
-const DT_INPUT: React.CSSProperties = {
-  width: "100%", boxSizing: "border-box",
-  border: "1px solid #e5e7eb", borderRadius: 10,
-  padding: "9px 10px", fontSize: 13, outline: "none",
-  background: "#f9fafb", color: "#374151",
-};
-const DT_LABEL: React.CSSProperties = {
-  fontSize: 11, color: "#6b7280", fontWeight: 600, display: "block", marginBottom: 4,
-};
+// DT_INPUT and DT_LABEL are computed per-component to support theming
 
 function RecordingArea({
   status, audioUrl,
@@ -197,6 +191,18 @@ function RecordingArea({
   children: Child[]; selectedChildId: string; onSelectChild: (id: string) => void;
   saved: boolean; onSave: () => void;
 }) {
+  const { theme } = useTheme();
+
+  const DT_INPUT: React.CSSProperties = {
+    width: "100%", boxSizing: "border-box",
+    border: `1px solid ${theme.border}`, borderRadius: 10,
+    padding: "9px 10px", fontSize: 13, outline: "none",
+    background: theme.bg, color: theme.text2,
+  };
+  const DT_LABEL: React.CSSProperties = {
+    fontSize: 11, color: theme.text3, fontWeight: 600, display: "block", marginBottom: 4,
+  };
+
   const isRecording   = status === "recording";
   const isPreview     = status === "preview";
   const isTranscribing = status === "transcribing";
@@ -224,7 +230,7 @@ function RecordingArea({
           <IonIcon icon={isRecording ? stopOutline : micOutline} style={{ fontSize: 46, color: "white" }} />
         </button>
 
-        <p style={{ color: "#6b7280", fontSize: 14, margin: 0 }}>
+        <p style={{ color: theme.text3, fontSize: 14, margin: 0 }}>
           {isRecording    ? "녹음 중… 버튼을 눌러 완료"
           : isPreview      ? "녹음 완료 — 아래에서 확인하세요"
           : isTranscribing ? "음성 인식 중…"
@@ -243,11 +249,11 @@ function RecordingArea({
 
       {/* 미리 듣기 */}
       {isPreview && audioUrl && (
-        <div style={{ width: "100%", background: "#f8fafc", borderRadius: 16, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#374151" }}>녹음된 파일 미리 듣기</p>
+        <div style={{ width: "100%", background: theme.cardAlt, borderRadius: 16, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: theme.text2 }}>녹음된 파일 미리 듣기</p>
           <audio src={audioUrl} controls style={{ width: "100%", borderRadius: 8 }} />
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={onReset} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151" }}>
+            <button onClick={onReset} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 13, cursor: "pointer", color: theme.text2 }}>
               다시 녹음
             </button>
             <button onClick={onTranscribe} style={{ flex: 2, padding: "10px 0", borderRadius: 10, border: "none", background: "#3880ff", fontSize: 13, fontWeight: 700, cursor: "pointer", color: "#fff" }}>
@@ -265,10 +271,10 @@ function RecordingArea({
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>인식 결과 (수정 가능)</span>
+              <span style={{ fontSize: 11, color: theme.text3, fontWeight: 600 }}>인식 결과 (수정 가능)</span>
               <button onClick={onReset} style={{
-                background: "none", border: "1px solid #e5e7eb", borderRadius: 8,
-                fontSize: 11, color: "#6b7280", cursor: "pointer", padding: "3px 10px",
+                background: "none", border: `1px solid ${theme.border}`, borderRadius: 8,
+                fontSize: 11, color: theme.text3, cursor: "pointer", padding: "3px 10px",
               }}>
                 🎙 다시 녹음
               </button>
@@ -280,10 +286,10 @@ function RecordingArea({
               placeholder="인식된 내용이 없습니다"
               style={{
                 width: "100%", boxSizing: "border-box",
-                border: "1px solid #e5e7eb", borderRadius: 12,
-                padding: "10px 14px", fontSize: 13, color: "#374151",
+                border: `1px solid ${theme.border}`, borderRadius: 12,
+                padding: "10px 14px", fontSize: 13, color: theme.text2,
                 lineHeight: 1.6, resize: "vertical", outline: "none",
-                background: "#f9fafb", fontFamily: "inherit",
+                background: theme.bg, fontFamily: "inherit",
               }}
             />
           </div>
@@ -316,14 +322,14 @@ function RecordingArea({
                 <button key={cat} onClick={() => onSelectCategory(cat)} style={{
                   display: "flex", alignItems: "center", gap: 4, padding: "6px 12px",
                   borderRadius: 20, cursor: "pointer",
-                  border: isSel ? `2px solid ${meta.color}` : "1.5px solid #e5e7eb",
-                  background: isSel ? meta.bg : "#fff",
-                  color: isSel ? meta.color : "#6b7280",
+                  border: isSel ? `2px solid ${meta.color}` : `1.5px solid ${theme.border}`,
+                  background: isSel ? meta.bg : theme.card,
+                  color: isSel ? meta.color : theme.text3,
                   fontSize: 12, fontWeight: isSel ? 700 : 500,
                 }}>
                   <span>{meta.emoji}</span>
                   <span>{meta.label}</span>
-                  {isAuto && <span style={{ fontSize: 9, color: "#9ca3af" }}>AI</span>}
+                  {isAuto && <span style={{ fontSize: 9, color: theme.text4 }}>AI</span>}
                 </button>
               );
             })}
@@ -331,7 +337,7 @@ function RecordingArea({
 
           {children.length > 0 && (
             <select value={selectedChildId} onChange={(e) => onSelectChild(e.target.value)}
-              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 13, color: "#374151", background: "#fff", outline: "none" }}>
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, fontSize: 13, color: theme.text2, background: theme.card, outline: "none" }}>
               <option value="">아이 선택 (선택사항)</option>
               {children.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -358,6 +364,7 @@ function RecordingArea({
 // ── 직접 입력 영역 ────────────────────────────────────────────
 
 function ManualInputArea({ kids }: { kids: Child[] }) {
+  const { theme } = useTheme();
   const nowStr = () => toHHMM(new Date().toISOString());
 
   const [category, setCategory]   = useState<Category>("feeding");
@@ -368,6 +375,16 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
   const [saved, setSaved]         = useState(false);
 
   const isInstant = INSTANT_CATS.has(category);
+
+  const DT_INPUT: React.CSSProperties = {
+    width: "100%", boxSizing: "border-box",
+    border: `1px solid ${theme.border}`, borderRadius: 10,
+    padding: "9px 10px", fontSize: 13, outline: "none",
+    background: theme.bg, color: theme.text2,
+  };
+  const DT_LABEL: React.CSSProperties = {
+    fontSize: 11, color: theme.text3, fontWeight: 600, display: "block", marginBottom: 4,
+  };
 
   const handleSave = () => {
     const ts = hhmmToISO(startTime);
@@ -395,7 +412,7 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
 
       {/* 카테고리 버튼 그리드 */}
       <div>
-        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>카테고리</span>
+        <span style={{ fontSize: 12, color: theme.text3, fontWeight: 600 }}>카테고리</span>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
           {ALL_CATEGORIES.map((cat) => {
             const meta = CATEGORY_META[cat];
@@ -403,13 +420,13 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
             return (
               <button key={cat} onClick={() => setCategory(cat)} style={{
                 padding: "16px 8px", borderRadius: 14, cursor: "pointer",
-                border: isSel ? `2px solid ${meta.color}` : "1.5px solid #e5e7eb",
-                background: isSel ? meta.bg : "#fff",
+                border: isSel ? `2px solid ${meta.color}` : `1.5px solid ${theme.border}`,
+                background: isSel ? meta.bg : theme.card,
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                 transition: "all 0.15s",
               }}>
                 <span style={{ fontSize: 26 }}>{meta.emoji}</span>
-                <span style={{ fontSize: 13, fontWeight: isSel ? 700 : 500, color: isSel ? meta.color : "#374151" }}>
+                <span style={{ fontSize: 13, fontWeight: isSel ? 700 : 500, color: isSel ? meta.color : theme.text2 }}>
                   {meta.label}
                 </span>
               </button>
@@ -440,7 +457,7 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
       {/* 아이 선택 */}
       {kids.length > 0 && (
         <select value={childId} onChange={(e) => setChildId(e.target.value)}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 13, color: "#374151", background: "#fff", outline: "none" }}>
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, fontSize: 13, color: theme.text2, background: theme.card, outline: "none" }}>
           <option value="">아이 선택 (선택사항)</option>
           {kids.map((c) => (
             <option key={c.id} value={c.id}>{c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}{c.twinGroupId ? " · 쌍둥이" : ""}</option>
@@ -454,7 +471,7 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
         <textarea
           value={memo} onChange={(e) => setMemo(e.target.value)}
           rows={2} placeholder="기록할 내용을 입력하세요"
-          style={{ width: "100%", boxSizing: "border-box", border: "1px solid #e5e7eb", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#374151", lineHeight: 1.6, resize: "vertical", outline: "none", background: "#f9fafb", fontFamily: "inherit" }}
+          style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${theme.border}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: theme.text2, lineHeight: 1.6, resize: "vertical", outline: "none", background: theme.bg, fontFamily: "inherit" }}
         />
       </div>
 
@@ -474,6 +491,7 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
 // ── 메인 탭 ──────────────────────────────────────────────────
 
 export default function RecordingTab() {
+  const { theme } = useTheme();
   const [subTab, setSubTab]             = useState<"record" | "manual">("record");
   const [status, setStatus]             = useState<RecordStatus>("idle");
   const [audioUrl, setAudioUrl]         = useState<string | null>(null);
@@ -588,23 +606,23 @@ export default function RecordingTab() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ flex: 1, overflow: "auto", padding: "20px 16px 24px", display: "flex", flexDirection: "column", gap: 16, background: "#f9fafb" }}>
+      <div style={{ flex: 1, overflow: "auto", padding: "20px 16px 24px", display: "flex", flexDirection: "column", gap: 16, background: theme.bg }}>
 
         {/* 서브 탭 토글 */}
-        <div style={{ display: "flex", background: "#e5e7eb", borderRadius: 10, padding: 3 }}>
+        <div style={{ display: "flex", background: theme.segBg, borderRadius: 10, padding: 3 }}>
           {([["record", "🎙 녹음"], ["manual", "✏️ 직접 입력"]] as const).map(([key, label]) => (
             <button key={key} onClick={() => setSubTab(key)} style={{
               flex: 1, padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer",
               fontSize: 13, fontWeight: 600, transition: "all 0.15s",
-              background: subTab === key ? "#fff" : "transparent",
-              color: subTab === key ? "#111827" : "#9ca3af",
+              background: subTab === key ? theme.segActive : "transparent",
+              color: subTab === key ? theme.text1 : theme.text4,
               boxShadow: subTab === key ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
             }}>{label}</button>
           ))}
         </div>
 
         {/* 카드 */}
-        <div style={{ background: "#fff", borderRadius: 20, padding: "24px 16px 20px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
+        <div style={{ background: theme.card, borderRadius: 20, padding: "24px 16px 20px", boxShadow: `0 2px 12px ${theme.shadow}` }}>
           {subTab === "record" ? (
             <RecordingArea
               status={status} audioUrl={audioUrl}
@@ -623,9 +641,9 @@ export default function RecordingTab() {
 
         {/* 아이 현황 카드 */}
         {children.length === 0 ? (
-          <div style={{ background: "#fff", borderRadius: 20, padding: "24px 16px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 4 }}>
+          <div style={{ background: theme.card, borderRadius: 20, padding: "24px 16px", boxShadow: `0 2px 12px ${theme.shadow}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 4 }}>
             <span style={{ fontSize: 32 }}>👶</span>
-            <p style={{ margin: 0, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
+            <p style={{ margin: 0, color: theme.text4, fontSize: 13, textAlign: "center" }}>
               설정에서 아이를 등록하면<br />활동 현황이 표시됩니다
             </p>
           </div>
