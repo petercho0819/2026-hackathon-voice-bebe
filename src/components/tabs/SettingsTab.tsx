@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { seedDemoData } from "@/lib/seedData";
 import { useTheme } from "@/contexts/ThemeContext";
+import { Caregiver, FIXED_CAREGIVERS, loadActiveCaregiverId, setActiveCaregiverId, ensureFixedCaregivers, caregiverEmoji } from "@/lib/caregivers";
 
 interface Child {
   id: string;
@@ -81,6 +82,37 @@ function Toggle({ defaultChecked }: { defaultChecked?: boolean }) {
         transition: "left 0.2s", left: on ? 22 : 2,
       }} />
     </button>
+  );
+}
+
+// ── CaregiverCard ─────────────────────────────────────────────
+
+function CaregiverCard({ caregiver, isActive, onSetActive }: {
+  caregiver: Caregiver; isActive: boolean; onSetActive: () => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "12px 16px", background: theme.card, borderBottom: `1px solid ${theme.borderLight}`,
+      borderLeft: isActive ? "3px solid #3880ff" : "3px solid transparent",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 38, height: 38, borderRadius: "50%", background: isActive ? "#eff6ff" : theme.subtleBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+          {caregiverEmoji(caregiver.role)}
+        </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: theme.text1 }}>{caregiver.name}</span>
+            {caregiver.role && <span style={{ fontSize: 12, color: theme.text4 }}>({caregiver.role})</span>}
+            {isActive && <span style={{ fontSize: 10, color: "#3880ff", background: "#eff6ff", padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>현재 양육자</span>}
+          </div>
+        </div>
+      </div>
+      {!isActive && (
+        <button onClick={onSetActive} style={{ background: "none", border: `1px solid ${theme.border}`, borderRadius: 8, cursor: "pointer", color: "#3880ff", fontSize: 13, fontWeight: 600, padding: "5px 12px" }}>선택</button>
+      )}
+    </div>
   );
 }
 
@@ -378,6 +410,8 @@ export default function SettingsTab() {
   const [modalTarget, setModalTarget] = useState<Child | null | "new">(null);
   const [deleteTarget, setDeleteTarget] = useState<Child | null>(null);
 
+  const [activeCaregiverState, setActiveCaregiverState] = useState<string | null>(null);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem("registered-children");
@@ -390,11 +424,18 @@ export default function SettingsTab() {
         setChildren(migrated);
       }
     } catch {}
+    ensureFixedCaregivers();
+    setActiveCaregiverState(loadActiveCaregiverId());
   }, []);
 
   const saveChildren = (updated: Child[]) => {
     setChildren(updated);
     localStorage.setItem("registered-children", JSON.stringify(updated));
+  };
+
+  const handleSetActiveCaregiver = (id: string) => {
+    setActiveCaregiverState(id);
+    setActiveCaregiverId(id);
   };
 
   const handleSave = (data: Omit<Child, "id" | "twinGroupId">, twinSiblingId: string | null) => {
@@ -430,6 +471,17 @@ export default function SettingsTab() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ flex: 1, overflow: "auto", background: theme.bg }}>
+
+        {/* 양육자 */}
+        <SectionLabel label="양육자" />
+        {FIXED_CAREGIVERS.map((cg) => (
+          <CaregiverCard
+            key={cg.id}
+            caregiver={cg}
+            isActive={cg.id === activeCaregiverState}
+            onSetActive={() => handleSetActiveCaregiver(cg.id)}
+          />
+        ))}
 
         {/* 아이 등록 */}
         <div style={{ padding: "16px 16px 4px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

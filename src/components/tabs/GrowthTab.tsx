@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { Caregiver, loadCaregivers, loadActiveCaregiverId, caregiverEmoji } from "@/lib/caregivers";
 
 // ── 타입 ─────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ interface Child {
 interface DiaryRecord {
   id: string;
   childId: string;
+  caregiverId?: string;
   date: string;
   content: string;
   emoji: string;
@@ -179,7 +181,7 @@ function DiaryEntryModal({
   );
 }
 
-function DiaryView({ childId, birthDate }: { childId: string; birthDate?: string }) {
+function DiaryView({ childId, birthDate, caregiverMap }: { childId: string; birthDate?: string; caregiverMap: Record<string, Caregiver> }) {
   const { theme } = useTheme();
   const [all, setAll]                 = useState<DiaryRecord[]>([]);
   const [modal, setModal]             = useState<DiaryRecord | null | "new">(null);
@@ -191,7 +193,7 @@ function DiaryView({ childId, birthDate }: { childId: string; birthDate?: string
 
   const save = (data: Pick<DiaryRecord, "date" | "content" | "emoji">) => {
     if (modal === "new") {
-      const next = [...all, { id: crypto.randomUUID(), childId, ...data }];
+      const next = [...all, { id: crypto.randomUUID(), childId, caregiverId: loadActiveCaregiverId() ?? undefined, ...data }];
       saveDiary(next); setAll(next);
     } else if (modal) {
       const next = all.map((r) => r.id === modal.id ? { ...modal, ...data } : r);
@@ -236,6 +238,11 @@ function DiaryView({ childId, birthDate }: { childId: string; birthDate?: string
                     <span style={{ fontSize: 14, fontWeight: 700, color: theme.text1 }}>{formatDate(r.date)}</span>
                     {ageLabel(birthDate, r.date) && (
                       <span style={{ fontSize: 12, color: theme.text4, marginLeft: 6 }}>{ageLabel(birthDate, r.date)}</span>
+                    )}
+                    {r.caregiverId && caregiverMap[r.caregiverId] && (
+                      <span style={{ fontSize: 10, color: theme.text4, background: theme.subtleBg, padding: "1px 6px", borderRadius: 6, marginLeft: 6 }}>
+                        {caregiverEmoji(caregiverMap[r.caregiverId].role)} {caregiverMap[r.caregiverId].name} ({caregiverMap[r.caregiverId].role})
+                      </span>
                     )}
                   </div>
                 </div>
@@ -440,12 +447,16 @@ export default function GrowthTab() {
   const [subTab, setSubTab]   = useState<"diary" | "album">("diary");
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
+  const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
 
   useEffect(() => {
     const kids = loadChildren();
     setChildren(kids);
     if (kids.length > 0) setSelectedChildId(kids[0].id);
+    setCaregivers(loadCaregivers());
   }, []);
+
+  const caregiverMap: Record<string, Caregiver> = Object.fromEntries(caregivers.map((c) => [c.id, c]));
 
   const selectedChild = children.find((c) => c.id === selectedChildId);
 
@@ -516,7 +527,7 @@ export default function GrowthTab() {
       {/* 콘텐츠 */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: theme.bg, padding: "12px 16px 0" }}>
         {subTab === "diary"
-          ? <DiaryView childId={selectedChildId} birthDate={selectedChild?.birthDate} />
+          ? <DiaryView childId={selectedChildId} birthDate={selectedChild?.birthDate} caregiverMap={caregiverMap} />
           : (
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 24 }}>
               <PhotoView childId={selectedChildId} birthDate={selectedChild?.birthDate} />

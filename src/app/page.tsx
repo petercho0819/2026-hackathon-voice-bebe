@@ -9,6 +9,7 @@ import StatusTab from "@/components/tabs/StatusTab";
 import TimelineTab from "@/components/tabs/TimelineTab";
 import GrowthTab from "@/components/tabs/GrowthTab";
 import SettingsTab from "@/components/tabs/SettingsTab";
+import EmergencyChat from "@/components/EmergencyChat";
 
 type Tab = "recording" | "status" | "timeline" | "growth" | "settings";
 
@@ -22,6 +23,12 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("recording");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMounted, setChatMounted] = useState(false);
+
+  const openChat = () => { setChatMounted(true); setChatOpen(true); };
+  const closeChat = () => setChatOpen(false);
+  const exitChat = () => { setChatOpen(false); setChatMounted(false); };
   const { theme, isDark } = useTheme();
 
   return (
@@ -58,6 +65,7 @@ export default function Home() {
           </button>
           {/* 응급챗 버튼 */}
           <button
+            onClick={openChat}
             style={{
               height: 36, padding: "0 14px", borderRadius: 18, border: "none", cursor: "pointer",
               background: "#ef4444",
@@ -80,6 +88,13 @@ export default function Home() {
         {activeTab === "growth" && <GrowthTab />}
         {activeTab === "settings" && <SettingsTab />}
       </div>
+
+      {/* 응급챗 모달 — 마운트 유지, display로 숨김 */}
+      {chatMounted && (
+        <div style={{ display: chatOpen ? "block" : "none" }}>
+          <EmergencyChat onClose={closeChat} onExit={exitChat} />
+        </div>
+      )}
 
       {/* 하단 탭바 */}
       <nav style={{

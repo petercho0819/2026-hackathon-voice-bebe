@@ -4,6 +4,7 @@ import { IonIcon } from "@ionic/react";
 import { micOutline, stopOutline } from "ionicons/icons";
 import { useState, useRef, useEffect } from "react";
 import { Category, CATEGORY_META, VoiceRecord, detectCategory, saveRecord, loadRecords } from "@/lib/records";
+import { loadActiveCaregiverId } from "@/lib/caregivers";
 import { useTheme } from "@/contexts/ThemeContext";
 
 // ── 타입 ─────────────────────────────────────────────────────
@@ -69,14 +70,20 @@ function hhmmToISO(hhmm: string): string {
   return d.toISOString();
 }
 
-function getLastRecord(records: VoiceRecord[], childId: string, category: Category): VoiceRecord | null {
-  return records
-    .filter((r) => r.category === category && r.childId === childId)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] ?? null;
-}
-
 const ALL_CATEGORIES: Category[] = ["feeding", "sleep", "diaper", "bath", "medication", "other"];
 const INSTANT_CATS = new Set<Category>(["diaper", "medication"]);
+
+function getLastRecord(records: VoiceRecord[], childId: string, category: Category, nowMs: number): VoiceRecord | null {
+  const isInstant = INSTANT_CATS.has(category);
+  return records
+    .filter((r) => {
+      if (r.category !== category || r.childId !== childId) return false;
+      if (new Date(r.timestamp).getTime() > nowMs) return false;
+      if (!isInstant && r.endTime && new Date(r.endTime).getTime() > nowMs) return false;
+      return true;
+    })
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] ?? null;
+}
 
 function plusOneMinute(iso: string): string {
   const d = new Date(iso);
@@ -84,14 +91,31 @@ function plusOneMinute(iso: string): string {
   return d.toISOString();
 }
 
+function detectChildId(text: string, kids: Child[]): string {
+  const normalized = text.replace(/\s/g, "");
+  for (const kid of kids) {
+    if (normalized.includes(kid.name.replace(/\s/g, ""))) return kid.id;
+    for (const nick of kid.nicknames) {
+      if (nick && normalized.includes(nick.replace(/\s/g, ""))) return kid.id;
+    }
+  }
+  return kids.length > 0 ? kids[0].id : "";
+}
+
 // ── 아이 현황 카드 ────────────────────────────────────────────
 
 function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecord[] }) {
   const { theme } = useTheme();
-  const now = Date.now();
-  const sleepRec  = getLastRecord(records, child.id, "sleep");
-  const feedRec   = getLastRecord(records, child.id, "feeding");
-  const diaperRec = getLastRecord(records, child.id, "diaper");
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const sleepRec  = getLastRecord(records, child.id, "sleep", now);
+  const feedRec   = getLastRecord(records, child.id, "feeding", now);
+  const diaperRec = getLastRecord(records, child.id, "diaper", now);
   const age       = calcAge(child.birthDate);
   const emoji     = child.gender === "female" ? "👧" : "👦";
   const genderBg  = child.gender === "female" ? "#fdf2f8" : "#eff6ff";
@@ -148,16 +172,25 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
             <span style={{ fontSize: 16, width: 24, textAlign: "center", flexShrink: 0 }}>{icon}</span>
             {rec ? (
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 14, color: theme.text2 }}>
-                  {label}{" "}
-                  <span style={{ fontWeight: 700, color: CATEGORY_META[category].color }}>
-                    {formatElapsed(now - new Date(rec.timestamp).getTime())}
-                  </span>
-                  {" "}지났어요
-                </span>
-                <span style={{ fontSize: 11, color: theme.text4, whiteSpace: "nowrap" }}>
-                  마지막 시간 : {formatHHMM(rec.timestamp)}
-                </span>
+                {(() => {
+                  const refTime = INSTANT_CATS.has(category)
+                    ? rec.timestamp
+                    : (rec.endTime ?? rec.timestamp);
+                  return (
+                    <>
+                      <span style={{ fontSize: 14, color: theme.text2 }}>
+                        {label}{" "}
+                        <span style={{ fontWeight: 700, color: CATEGORY_META[category].color }}>
+                          {formatElapsed(now - new Date(refTime).getTime())}
+                        </span>
+                        {" "}지났어요
+                      </span>
+                      <span style={{ fontSize: 11, color: theme.text4, whiteSpace: "nowrap" }}>
+                        마지막 시간 : {formatHHMM(refTime)}
+                      </span>
+                    </>
+                  );
+                })()}
               </div>
             ) : (
               <span style={{ fontSize: 13, color: theme.text5 }}>기록 없음</span>
@@ -336,15 +369,21 @@ function RecordingArea({
           </div>
 
           {children.length > 0 && (
-            <select value={selectedChildId} onChange={(e) => onSelectChild(e.target.value)}
-              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, fontSize: 13, color: theme.text2, background: theme.card, outline: "none" }}>
-              <option value="">아이 선택 (선택사항)</option>
-              {children.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}{c.twinGroupId ? " · 쌍둥이" : ""}
-                </option>
-              ))}
-            </select>
+            <div>
+              <span style={{ fontSize: 11, color: theme.text3, fontWeight: 600 }}>아이 선택</span>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                {children.map((c) => (
+                  <button key={c.id} onClick={() => onSelectChild(c.id)} style={{
+                    padding: "7px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: selectedChildId === c.id ? 700 : 500,
+                    border: selectedChildId === c.id ? "2px solid #3880ff" : `1.5px solid ${theme.border}`,
+                    background: selectedChildId === c.id ? "#eff6ff" : theme.card,
+                    color: selectedChildId === c.id ? "#3880ff" : theme.text3,
+                  }}>
+                    {c.gender === "female" ? "👧" : "👦"} {c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}{c.twinGroupId ? " · 쌍둥이" : ""}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           <button onClick={onSave} style={{
@@ -363,7 +402,7 @@ function RecordingArea({
 
 // ── 직접 입력 영역 ────────────────────────────────────────────
 
-function ManualInputArea({ kids }: { kids: Child[] }) {
+function ManualInputArea({ kids, onSaved }: { kids: Child[]; onSaved: () => void }) {
   const { theme } = useTheme();
   const nowStr = () => toHHMM(new Date().toISOString());
 
@@ -391,11 +430,13 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
     saveRecord({
       id: crypto.randomUUID(),
       childId: childId || null,
+      caregiverId: loadActiveCaregiverId() ?? undefined,
       timestamp: ts,
       endTime: isInstant ? plusOneMinute(ts) : hhmmToISO(endTime),
       transcript: memo,
       category,
     });
+    onSaved();
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
@@ -456,13 +497,21 @@ function ManualInputArea({ kids }: { kids: Child[] }) {
 
       {/* 아이 선택 */}
       {kids.length > 0 && (
-        <select value={childId} onChange={(e) => setChildId(e.target.value)}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${theme.border}`, fontSize: 13, color: theme.text2, background: theme.card, outline: "none" }}>
-          <option value="">아이 선택 (선택사항)</option>
-          {kids.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}{c.twinGroupId ? " · 쌍둥이" : ""}</option>
-          ))}
-        </select>
+        <div>
+          <span style={DT_LABEL}>아이 선택</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+            {kids.map((c) => (
+              <button key={c.id} onClick={() => setChildId(c.id)} style={{
+                padding: "7px 14px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: childId === c.id ? 700 : 500,
+                border: childId === c.id ? "2px solid #3880ff" : `1.5px solid ${theme.border}`,
+                background: childId === c.id ? "#eff6ff" : theme.card,
+                color: childId === c.id ? "#3880ff" : theme.text3,
+              }}>
+                {c.gender === "female" ? "👧" : "👦"} {c.name}{c.nicknames.length > 0 ? ` (${c.nicknames[0]})` : ""}{c.twinGroupId ? " · 쌍둥이" : ""}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* 메모 */}
@@ -566,7 +615,7 @@ export default function RecordingTab() {
       setEndTime(nowStr);
       const kids = loadChildren();
       setChildren(kids);
-      setSelectedChildId(kids.length > 0 ? kids[0].id : "");
+      setSelectedChildId(detectChildId(text, kids));
       setStatus("categorize");
     } catch (e) {
       setError(e instanceof Error ? e.message : "인식에 실패했습니다.");
@@ -580,6 +629,7 @@ export default function RecordingTab() {
     saveRecord({
       id: crypto.randomUUID(),
       childId: selectedChildId || null,
+      caregiverId: loadActiveCaregiverId() ?? undefined,
       timestamp: ts,
       endTime: INSTANT_CATS.has(selectedCategory) ? plusOneMinute(ts) : (endTime ? hhmmToISO(endTime) : now),
       transcript,
@@ -606,8 +656,9 @@ export default function RecordingTab() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ flex: 1, overflow: "auto", padding: "20px 16px 24px", display: "flex", flexDirection: "column", gap: 16, background: theme.bg }}>
 
+      {/* 상단 고정: 서브탭 + 녹음/직접입력 카드 */}
+      <div style={{ flexShrink: 0, padding: "20px 16px 0", display: "flex", flexDirection: "column", gap: 16, background: theme.bg }}>
         {/* 서브 탭 토글 */}
         <div style={{ display: "flex", background: theme.segBg, borderRadius: 10, padding: 3 }}>
           {([["record", "🎙 녹음"], ["manual", "✏️ 직접 입력"]] as const).map(([key, label]) => (
@@ -621,7 +672,7 @@ export default function RecordingTab() {
           ))}
         </div>
 
-        {/* 카드 */}
+        {/* 녹음/직접입력 카드 */}
         <div style={{ background: theme.card, borderRadius: 20, padding: "24px 16px 20px", boxShadow: `0 2px 12px ${theme.shadow}` }}>
           {subTab === "record" ? (
             <RecordingArea
@@ -635,13 +686,15 @@ export default function RecordingTab() {
               saved={saved} onSave={handleSave}
             />
           ) : (
-            <ManualInputArea kids={children} />
+            <ManualInputArea kids={children} onSaved={() => setRecords(loadRecords())} />
           )}
         </div>
+      </div>
 
-        {/* 아이 현황 카드 */}
+      {/* 하단 스크롤: 아이 현황 카드 */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 24px", display: "flex", flexDirection: "column", gap: 16, background: theme.bg, minHeight: 0 }}>
         {children.length === 0 ? (
-          <div style={{ background: theme.card, borderRadius: 20, padding: "24px 16px", boxShadow: `0 2px 12px ${theme.shadow}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 4 }}>
+          <div style={{ background: theme.card, borderRadius: 20, padding: "24px 16px", boxShadow: `0 2px 12px ${theme.shadow}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 32 }}>👶</span>
             <p style={{ margin: 0, color: theme.text4, fontSize: 13, textAlign: "center" }}>
               설정에서 아이를 등록하면<br />활동 현황이 표시됩니다

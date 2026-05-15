@@ -3,6 +3,7 @@ export type Category = "feeding" | "sleep" | "diaper" | "bath" | "medication" | 
 export interface VoiceRecord {
   id: string;
   childId: string | null;
+  caregiverId?: string;
   timestamp: string; // startTime (ISO)
   endTime: string;   // endTime (ISO)
   transcript: string;

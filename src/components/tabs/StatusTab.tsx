@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { loadRecords, saveRecord, updateRecord, deleteRecord, VoiceRecord, CATEGORY_META, Category } from "@/lib/records";
+import { Caregiver, loadCaregivers, loadActiveCaregiverId, caregiverEmoji } from "@/lib/caregivers";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface Child {
@@ -28,6 +29,7 @@ const INSTANT_CATS = new Set<Category>(["diaper", "medication"]);
 interface DiaryRecord {
   id: string;
   childId: string;
+  caregiverId?: string;
   date: string;    // YYYY-MM-DD
   content: string;
   emoji: string;
@@ -174,9 +176,11 @@ function DiaryEntryModal({
 function DiaryView({
   childId,
   childBirthDate,
+  caregiverMap,
 }: {
   childId: string;
   childBirthDate?: string;
+  caregiverMap: Record<string, Caregiver>;
 }) {
   const { theme } = useTheme();
   const [records, setRecords]     = useState<DiaryRecord[]>([]);
@@ -193,7 +197,7 @@ function DiaryView({
 
   const handleSave = (data: Pick<DiaryRecord, "date" | "content" | "emoji">) => {
     if (modalTarget === "new") {
-      const next = [...records, { id: crypto.randomUUID(), childId, ...data }];
+      const next = [...records, { id: crypto.randomUUID(), childId, caregiverId: loadActiveCaregiverId() ?? undefined, ...data }];
       saveDiaryRecords(next);
       setRecords(next);
     } else if (modalTarget) {
@@ -253,6 +257,11 @@ function DiaryView({
                     <span style={{ fontSize: 14, fontWeight: 700, color: theme.text1 }}>{formatDiaryDate(r.date)}</span>
                     {ageLabel && (
                       <span style={{ fontSize: 12, color: theme.text4, marginLeft: 6 }}>{ageLabel}</span>
+                    )}
+                    {r.caregiverId && caregiverMap[r.caregiverId] && (
+                      <span style={{ fontSize: 10, color: theme.text4, background: theme.subtleBg, padding: "1px 6px", borderRadius: 6, marginLeft: 6 }}>
+                        {caregiverEmoji(caregiverMap[r.caregiverId].role)} {caregiverMap[r.caregiverId].name} ({caregiverMap[r.caregiverId].role})
+                      </span>
                     )}
                   </div>
                 </div>
@@ -720,7 +729,7 @@ function calcAgeWeeksAndDays(birthDate: string | undefined, onDate: Date): { wee
   return { weeks: Math.floor(totalDays / 7), days: totalDays % 7, total: totalDays };
 }
 
-function DailyView({ records, date, childBirthDate, onEdit, onDelete }: { records: VoiceRecord[]; date: Date; childBirthDate?: string; onEdit: (r: VoiceRecord) => void; onDelete: (r: VoiceRecord) => void }) {
+function DailyView({ records, date, childBirthDate, caregiverMap, onEdit, onDelete }: { records: VoiceRecord[]; date: Date; childBirthDate?: string; caregiverMap: Record<string, Caregiver>; onEdit: (r: VoiceRecord) => void; onDelete: (r: VoiceRecord) => void }) {
   const { theme } = useTheme();
   const dayRecords = records
     .filter((r) => sameDay(r.timestamp, date))
@@ -864,6 +873,11 @@ function DailyView({ records, date, childBirthDate, onEdit, onDelete }: { record
                         {r.transcript.length > 45 ? r.transcript.slice(0, 45) + "…" : r.transcript}
                       </p>
                     )}
+                    {r.caregiverId && caregiverMap[r.caregiverId] && (
+                      <span style={{ fontSize: 10, color: theme.text4, background: theme.subtleBg, padding: "1px 6px", borderRadius: 6, display: "inline-block", marginTop: 2 }}>
+                        {caregiverEmoji(caregiverMap[r.caregiverId].role)} {caregiverMap[r.caregiverId].name} ({caregiverMap[r.caregiverId].role})
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexShrink: 0 }}>
                     <button onClick={() => onEdit(r)} style={{ background: "none", border: "none", cursor: "pointer", color: "#3880ff", fontSize: 12, padding: "4px 6px" }}>수정</button>
@@ -1005,12 +1019,14 @@ export default function StatusTab() {
   const [editTarget, setEditTarget]     = useState<VoiceRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VoiceRecord | null>(null);
   const [addingRecord, setAddingRecord] = useState(false);
+  const [caregivers, setCaregivers]     = useState<Caregiver[]>([]);
 
   useEffect(() => {
     setRecords(loadRecords());
     const kids = loadChildren();
     setChildren(kids);
     if (kids.length > 0) setSelectedChildId(kids[0].id);
+    setCaregivers(loadCaregivers());
   }, []);
 
   const filteredRecords = selectedChildId
@@ -1032,6 +1048,7 @@ export default function StatusTab() {
   };
 
   const selectedDate = getDayOffset(dayOffset);
+  const caregiverMap: Record<string, Caregiver> = Object.fromEntries(caregivers.map((c) => [c.id, c]));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -1108,10 +1125,10 @@ export default function StatusTab() {
       {/* 콘텐츠 */}
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", background: theme.bg }}>
         {tab === "daily"
-          ? <DailyView records={filteredRecords} date={selectedDate} childBirthDate={children.find((c) => c.id === selectedChildId)?.birthDate} onEdit={setEditTarget} onDelete={setDeleteTarget} />
+          ? <DailyView records={filteredRecords} date={selectedDate} childBirthDate={children.find((c) => c.id === selectedChildId)?.birthDate} caregiverMap={caregiverMap} onEdit={setEditTarget} onDelete={setDeleteTarget} />
           : tab === "weekly"
           ? <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 24px" }}><WeeklyView records={filteredRecords} /></div>
-          : <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 24px" }}><DiaryView childId={selectedChildId} childBirthDate={children.find((c) => c.id === selectedChildId)?.birthDate} /></div>
+          : <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 24px" }}><DiaryView childId={selectedChildId} childBirthDate={children.find((c) => c.id === selectedChildId)?.birthDate} caregiverMap={caregiverMap} /></div>
         }
       </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { GROWTH_REF, getPercentileBand, type GenderKey } from "@/lib/growthReference";
 import { useTheme } from "@/contexts/ThemeContext";
+import { Caregiver, loadCaregivers, loadActiveCaregiverId, caregiverEmoji } from "@/lib/caregivers";
 
 // ── 타입 ─────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ interface Child {
 interface HealthRecord {
   id: string;
   childId: string;
+  caregiverId?: string;
   date: string;             // YYYY-MM-DD
   height: string;           // cm
   weight: string;           // kg
@@ -66,6 +68,48 @@ function calcAge(birthDate: string, onDate: string): string {
   return `만 ${Math.floor(months / 12)}세`;
 }
 
+// ── 삭제 확인 모달 ───────────────────────────────────────────
+
+function DeleteConfirmModal({
+  record,
+  onConfirm,
+  onClose,
+}: {
+  record: HealthRecord;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: theme.overlayBg, zIndex: 200 }} />
+      <div style={{
+        position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)",
+        background: theme.card, borderRadius: 20, zIndex: 201,
+        width: "calc(100% - 48px)", maxWidth: 320,
+        padding: "28px 20px 20px",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+      }}>
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🗑️</div>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: theme.text1 }}>기록을 삭제할까요?</p>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: theme.text2 }}>{formatDate(record.date)}</p>
+          <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 6 }}>
+            {record.height && <span style={{ fontSize: 13, color: "#3b82f6" }}>키 {record.height}cm</span>}
+            {record.weight && <span style={{ fontSize: 13, color: "#f97316" }}>몸무게 {record.weight}kg</span>}
+            {record.headCircumference && <span style={{ fontSize: 13, color: "#10b981" }}>머리 {record.headCircumference}cm</span>}
+          </div>
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: theme.text4 }}>삭제한 기록은 복구할 수 없습니다</p>
+        <div style={{ display: "flex", gap: 10, width: "100%", marginTop: 4 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "13px 0", borderRadius: 10, border: `1px solid ${theme.border}`, background: theme.card, fontSize: 15, cursor: "pointer", color: theme.text2, fontWeight: 600 }}>취소</button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: "13px 0", borderRadius: 10, border: "none", background: "#ef4444", fontSize: 15, fontWeight: 700, cursor: "pointer", color: "#fff" }}>삭제</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── 모달 ─────────────────────────────────────────────────────
 
 function HealthRecordModal({
@@ -74,7 +118,7 @@ function HealthRecordModal({
   onClose,
 }: {
   initial?: HealthRecord;
-  onSave: (data: Omit<HealthRecord, "id" | "childId">) => void;
+  onSave: (data: Omit<HealthRecord, "id" | "childId" | "caregiverId">) => void;
   onClose: () => void;
 }) {
   const { theme } = useTheme();
@@ -160,11 +204,13 @@ function HealthRecordModal({
 function RecordCard({
   record,
   child,
+  caregiverMap,
   onEdit,
   onDelete,
 }: {
   record: HealthRecord;
   child: Child;
+  caregiverMap: Record<string, Caregiver>;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -182,6 +228,11 @@ function RecordCard({
         <div>
           <span style={{ fontSize: 14, fontWeight: 700, color: theme.text1 }}>{formatDate(record.date)}</span>
           <span style={{ fontSize: 12, color: theme.text4, marginLeft: 8 }}>{age}</span>
+          {record.caregiverId && caregiverMap[record.caregiverId] && (
+            <span style={{ fontSize: 10, color: theme.text4, background: theme.subtleBg, padding: "1px 6px", borderRadius: 6, marginLeft: 8 }}>
+              {caregiverEmoji(caregiverMap[record.caregiverId].role)} {caregiverMap[record.caregiverId].name} ({caregiverMap[record.caregiverId].role})
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", gap: 4 }}>
           <button onClick={onEdit} style={{ background: "none", border: "none", cursor: "pointer", color: "#3880ff", fontSize: 13, padding: "2px 8px" }}>수정</button>
@@ -527,13 +578,18 @@ export default function TimelineTab() {
   const [records, setRecords]       = useState<HealthRecord[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [modalTarget, setModalTarget] = useState<HealthRecord | null | "new">(null);
+  const [deleteTarget, setDeleteTarget] = useState<HealthRecord | null>(null);
+  const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
 
   useEffect(() => {
     const kids = loadChildren();
     setChildren(kids);
     if (kids.length > 0) setSelectedChildId(kids[0].id);
     setRecords(loadHealthRecords());
+    setCaregivers(loadCaregivers());
   }, []);
+
+  const caregiverMap: Record<string, Caregiver> = Object.fromEntries(caregivers.map((c) => [c.id, c]));
 
   const selectedChild = children.find((c) => c.id === selectedChildId);
 
@@ -541,9 +597,9 @@ export default function TimelineTab() {
     .filter((r) => r.childId === selectedChildId)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const handleSave = (data: Omit<HealthRecord, "id" | "childId">) => {
+  const handleSave = (data: Omit<HealthRecord, "id" | "childId" | "caregiverId">) => {
     if (modalTarget === "new") {
-      const updated = [...records, { id: crypto.randomUUID(), childId: selectedChildId, ...data }];
+      const updated = [...records, { id: crypto.randomUUID(), childId: selectedChildId, caregiverId: loadActiveCaregiverId() ?? undefined, ...data }];
       saveHealthRecords(updated);
       setRecords(updated);
     } else if (modalTarget) {
@@ -558,6 +614,7 @@ export default function TimelineTab() {
     const updated = records.filter((r) => r.id !== id);
     saveHealthRecords(updated);
     setRecords(updated);
+    setDeleteTarget(null);
   };
 
   if (children.length === 0) {
@@ -657,8 +714,9 @@ export default function TimelineTab() {
                     key={record.id}
                     record={record}
                     child={selectedChild}
+                    caregiverMap={caregiverMap}
                     onEdit={() => setModalTarget(record)}
-                    onDelete={() => handleDelete(record.id)}
+                    onDelete={() => setDeleteTarget(record)}
                   />
                 ) : null
               )}
@@ -673,6 +731,13 @@ export default function TimelineTab() {
           initial={modalTarget === "new" ? undefined : modalTarget}
           onSave={handleSave}
           onClose={() => setModalTarget(null)}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          record={deleteTarget}
+          onConfirm={() => handleDelete(deleteTarget.id)}
+          onClose={() => setDeleteTarget(null)}
         />
       )}
     </div>

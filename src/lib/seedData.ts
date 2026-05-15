@@ -1,5 +1,8 @@
 import type { VoiceRecord } from "./records";
 
+const MOM_ID = "caregiver-mom";
+const DAD_ID = "caregiver-dad";
+
 // ── 공통 헬퍼 ─────────────────────────────────────────────────
 
 function uuid(): string {
@@ -45,10 +48,10 @@ interface Ev {
   cat: VoiceRecord["category"];
 }
 
-function makeRecord(childId: string, dateStr: string, ev: Ev): VoiceRecord {
+function makeRecord(childId: string, dateStr: string, ev: Ev, caregiverId?: string): VoiceRecord {
   const start = iso(dateStr, ev.hhmm);
   const end   = iso(dateStr, ev.endHhmm);
-  return { id: uuid(), childId, timestamp: start, endTime: end, transcript: ev.memo, category: ev.cat };
+  return { id: uuid(), childId, caregiverId, timestamp: start, endTime: end, transcript: ev.memo, category: ev.cat };
 }
 
 /** 수유 이벤트 */
@@ -213,7 +216,7 @@ function eventsThird(dayIndex: number): Ev[] {
 
 // ── 건강기록 시드 ─────────────────────────────────────────────
 
-interface HealthRecord { id: string; childId: string; date: string; height: string; weight: string; headCircumference: string; }
+interface HealthRecord { id: string; childId: string; caregiverId?: string; date: string; height: string; weight: string; headCircumference: string; }
 
 interface ChildInfo { id: string; birthDate?: string; height?: string; weight?: string; gender?: string; }
 
@@ -255,7 +258,8 @@ function seedHealthRecords(children: ChildInfo[]): void {
       const weight = (base[1] + vary(0, 4) * 0.1).toFixed(1);
       const head   = (base[2] + vary(0, 2) * 0.1).toFixed(1);
 
-      newRecords.push({ id: uuid(), childId: child.id, date: dateStr, height, weight, headCircumference: head });
+      const caregiverId = m % 2 === 0 ? MOM_ID : DAD_ID;
+      newRecords.push({ id: uuid(), childId: child.id, caregiverId, date: dateStr, height, weight, headCircumference: head });
     }
   });
 
@@ -264,7 +268,7 @@ function seedHealthRecords(children: ChildInfo[]): void {
 
 // ── 성장일기 시드 ─────────────────────────────────────────────
 
-interface DiaryRecord { id: string; childId: string; date: string; content: string; emoji: string; }
+interface DiaryRecord { id: string; childId: string; caregiverId?: string; date: string; content: string; emoji: string; }
 
 const DIARY_POOL = [
   ["😊", "오늘 처음으로 혼자 앉아 있었어! 10초 정도 버텼는데 너무 기특했다 💕"],
@@ -292,7 +296,8 @@ function seedDiaryRecords(children: ChildInfo[]): void {
     writeDays.forEach((daysAgoN, wi) => {
       const poolIdx = (ci * 5 + wi) % DIARY_POOL.length;
       const [emoji, content] = DIARY_POOL[poolIdx];
-      newRecords.push({ id: uuid(), childId: child.id, date: ago(daysAgoN), content, emoji });
+      const caregiverId = daysAgoN % 2 === 0 ? MOM_ID : DAD_ID;
+      newRecords.push({ id: uuid(), childId: child.id, caregiverId, date: ago(daysAgoN), content, emoji });
     });
   });
 
@@ -315,10 +320,12 @@ export function seedDemoData(): number {
     for (let daysAgoN = 13; daysAgoN >= 0; daysAgoN--) {
       const dateStr = ago(daysAgoN);
       const events = planner(daysAgoN);
+      const caregiverId = daysAgoN % 2 === 0 ? MOM_ID : DAD_ID;
 
       for (const ev of events) {
+        if (daysAgoN === 0 && ev.hhmm >= "10:00") continue;
         try {
-          records.push(makeRecord(child.id, dateStr, ev));
+          records.push(makeRecord(child.id, dateStr, ev, caregiverId));
         } catch {
           // 잘못된 이벤트 건너뜀
         }
