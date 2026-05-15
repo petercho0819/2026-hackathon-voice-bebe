@@ -49,7 +49,7 @@ export default function Home() {
   const openChat = () => { setChatMounted(true); setChatOpen(true); };
   const closeChat = () => setChatOpen(false);
   const exitChat = () => { setChatOpen(false); setChatMounted(false); };
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   // 마운트 시 localStorage + 지원 여부 확인
   useEffect(() => {
@@ -134,9 +134,9 @@ export default function Home() {
         justifyContent: "space-between",
       }}>
         <img
-          src="/assest/logo.png"
+          src={isDark ? "/assest/dark_mode.png" : "/assest/light_mode.png"}
           alt="보이스 베베"
-          style={{ height: 36, display: "block" }}
+          style={{ height: isDark ? 36 : 28, display: "block" }}
         />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* 녹음 버튼 */}
