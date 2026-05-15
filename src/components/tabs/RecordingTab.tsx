@@ -209,7 +209,7 @@ function ChildStatusCard({ child, records }: { child: Child; records: VoiceRecor
 function RecordingArea({
   status, audioUrl,
   onStart, onStop, onReset, onTranscribe,
-  transcript, onTranscriptChange, error,
+  transcript, onTranscriptChange, rawTranscript, error,
   startTime, onStartTimeChange, endTime, onEndTimeChange,
   detectedCategory, selectedCategory, onSelectCategory,
   children, selectedChildId, onSelectChild,
@@ -217,7 +217,7 @@ function RecordingArea({
 }: {
   status: RecordStatus; audioUrl: string | null;
   onStart: () => void; onStop: () => void; onReset: () => void; onTranscribe: () => void;
-  transcript: string; onTranscriptChange: (text: string) => void; error: string;
+  transcript: string; onTranscriptChange: (text: string) => void; rawTranscript: string; error: string;
   startTime: string; onStartTimeChange: (v: string) => void;
   endTime: string; onEndTimeChange: (v: string) => void;
   detectedCategory: Category; selectedCategory: Category; onSelectCategory: (c: Category) => void;
@@ -302,9 +302,9 @@ function RecordingArea({
       {/* 카테고리 분류 + 저장 */}
       {isCategorize && (
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, color: theme.text3, fontWeight: 600 }}>인식 결과 (수정 가능)</span>
+              <span style={{ fontSize: 11, color: theme.text3, fontWeight: 600 }}>AI 요약 (수정 가능)</span>
               <button onClick={onReset} style={{
                 background: "none", border: `1px solid ${theme.border}`, borderRadius: 8,
                 fontSize: 11, color: theme.text3, cursor: "pointer", padding: "3px 10px",
@@ -312,19 +312,31 @@ function RecordingArea({
                 🎙 다시 녹음
               </button>
             </div>
-            <textarea
+            {/* 요약 입력 */}
+            <input
+              type="text"
               value={transcript}
               onChange={(e) => onTranscriptChange(e.target.value)}
-              rows={3}
-              placeholder="인식된 내용이 없습니다"
+              placeholder="요약 내용을 입력하세요"
               style={{
                 width: "100%", boxSizing: "border-box",
-                border: `1px solid ${theme.border}`, borderRadius: 12,
-                padding: "10px 14px", fontSize: 13, color: theme.text2,
-                lineHeight: 1.6, resize: "vertical", outline: "none",
-                background: theme.bg, fontFamily: "inherit",
+                border: `1.5px solid #3880ff`, borderRadius: 10,
+                padding: "10px 14px", fontSize: 14, fontWeight: 600, color: theme.text1,
+                outline: "none", background: theme.bg, fontFamily: "inherit",
               }}
             />
+            {/* 원문 참고 */}
+            {rawTranscript && (
+              <div style={{
+                background: theme.cardAlt, borderRadius: 10, padding: "8px 12px",
+                border: `1px solid ${theme.borderLight}`,
+              }}>
+                <span style={{ fontSize: 10, color: theme.text4, fontWeight: 600 }}>원문</span>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: theme.text3, lineHeight: 1.6 }}>
+                  {rawTranscript}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* 시간 */}
@@ -546,6 +558,7 @@ export default function RecordingTab() {
   const [audioUrl, setAudioUrl]         = useState<string | null>(null);
   const [audioBlobRef, setAudioBlobRef] = useState<{ blob: Blob; mimeType: string } | null>(null);
   const [transcript, setTranscript]     = useState("");
+  const [rawTranscript, setRawTranscript] = useState("");
   const [error, setError]               = useState("");
   const [startTime, setStartTime]       = useState("");
   const [endTime, setEndTime]           = useState("");
@@ -606,6 +619,7 @@ export default function RecordingTab() {
       if (data.error) throw new Error(data.error);
       const text: string = data.text ?? "";
       setTranscript(text);
+      setRawTranscript(data.transcript ?? text);
       const VALID = new Set(["feeding", "sleep", "diaper", "bath", "medication", "other"]);
       const cat: Category = VALID.has(data.category) ? (data.category as Category) : detectCategory(text);
       setDetectedCategory(cat);
@@ -640,7 +654,7 @@ export default function RecordingTab() {
     setTimeout(() => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
       setAudioUrl(null); setAudioBlobRef(null);
-      setTranscript(""); setError(""); setSaved(false);
+      setTranscript(""); setRawTranscript(""); setError(""); setSaved(false);
       setStartTime(""); setEndTime("");
       setStatus("idle");
     }, 1200);
@@ -649,7 +663,7 @@ export default function RecordingTab() {
   const reset = () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null); setAudioBlobRef(null);
-    setTranscript(""); setError(""); setSaved(false);
+    setTranscript(""); setRawTranscript(""); setError(""); setSaved(false);
     setStartTime(""); setEndTime("");
     setStatus("idle");
   };
@@ -678,7 +692,7 @@ export default function RecordingTab() {
             <RecordingArea
               status={status} audioUrl={audioUrl}
               onStart={startRecording} onStop={stopRecording} onReset={reset} onTranscribe={transcribe}
-              transcript={transcript} onTranscriptChange={setTranscript} error={error}
+              transcript={transcript} onTranscriptChange={setTranscript} rawTranscript={rawTranscript} error={error}
               startTime={startTime} onStartTimeChange={setStartTime}
               endTime={endTime} onEndTimeChange={setEndTime}
               detectedCategory={detectedCategory} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory}
