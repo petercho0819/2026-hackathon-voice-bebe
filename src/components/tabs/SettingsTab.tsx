@@ -404,7 +404,12 @@ function InviteCodeSection() {
 
 // ── 메인 ─────────────────────────────────────────────────────
 
-export default function SettingsTab({ onSeedComplete }: { onSeedComplete?: () => void }) {
+export default function SettingsTab({ onSeedComplete, wakeWordActive, onWakeWordChange, wakeWordSupported }: {
+  onSeedComplete?: () => void;
+  wakeWordActive?: boolean;
+  onWakeWordChange?: (v: boolean) => void;
+  wakeWordSupported?: boolean;
+}) {
   const { theme } = useTheme();
   const [children, setChildren] = useState<Child[]>([]);
   const [modalTarget, setModalTarget] = useState<Child | null | "new">(null);
@@ -509,7 +514,28 @@ export default function SettingsTab({ onSeedComplete }: { onSeedComplete?: () =>
 
         {/* 음성 인식 */}
         <SectionLabel label="음성 인식" />
-        <Row label="자동 녹음 시작" right={<Toggle />} />
+        <Row
+          label="보이스 베베 웨이크워드"
+          right={
+            wakeWordSupported === false ? (
+              <span style={{ fontSize: 12, color: theme.text4 }}>미지원</span>
+            ) : (
+              <button
+                onClick={() => onWakeWordChange?.(!wakeWordActive)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
+                  background: wakeWordActive ? "#3880ff" : "#d1d5db",
+                  position: "relative", transition: "background 0.2s", flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: "absolute", top: 2, width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                  transition: "left 0.2s", left: wakeWordActive ? 22 : 2,
+                }} />
+              </button>
+            )
+          }
+        />
         <Row label="소음 필터" right={<Toggle defaultChecked />} />
 
         {/* 알림 */}

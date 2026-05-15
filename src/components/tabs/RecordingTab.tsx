@@ -533,7 +533,7 @@ function ManualInputArea({ kids, onSaved }: { kids: Child[]; onSaved: () => void
 
 // ── 메인 탭 ──────────────────────────────────────────────────
 
-export default function RecordingTab() {
+export default function RecordingTab({ externalTrigger = 0 }: { externalTrigger?: number }) {
   const { theme } = useTheme();
   const [subTab, setSubTab]             = useState<"record" | "manual">("record");
   const [status, setStatus]             = useState<RecordStatus>("idle");
@@ -552,11 +552,22 @@ export default function RecordingTab() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef        = useRef<Blob[]>([]);
   const pendingBlobRef   = useRef<{ blob: Blob; mimeType: string } | null>(null);
+  const statusRef        = useRef<RecordStatus>("idle");
+
+  // statusRef는 항상 최신 status를 반영
+  statusRef.current = status;
 
   useEffect(() => {
     setRecords(loadRecords());
     setChildren(loadChildren());
   }, []);
+
+  // 웨이크워드 트리거: idle 상태일 때만 녹음 시작
+  useEffect(() => {
+    if (!externalTrigger) return;
+    if (statusRef.current === "idle") startRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalTrigger]);
 
   const startRecording = async () => {
     setError(""); setTranscript(""); setSaved(false);
