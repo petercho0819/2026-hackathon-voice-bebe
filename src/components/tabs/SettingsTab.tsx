@@ -526,8 +526,13 @@ export default function SettingsTab() {
           <button
             onClick={() => {
               const count = seedDemoData();
-              if (count > 0) alert(`데모 데이터 ${count}건이 추가되었습니다.\n(최근 2주치, 등록된 아이 최대 3명)`);
-              else alert("먼저 아이를 등록해주세요.");
+              // seeding 후 children 목록 새로고침
+              try {
+                const saved = localStorage.getItem("registered-children");
+                if (saved) setChildren(JSON.parse(saved));
+              } catch {}
+              setActiveCaregiverState(loadActiveCaregiverId());
+              alert(`데모 데이터 ${count}건이 추가되었습니다.\n(최근 2주치, 등록된 아이 최대 3명)`);
             }}
             style={{ width: "100%", padding: "12px 0", borderRadius: 10, border: `1.5px dashed ${theme.border}`, background: theme.subtleBg, fontSize: 14, fontWeight: 600, color: theme.text3, cursor: "pointer" }}
           >

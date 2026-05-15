@@ -372,8 +372,10 @@ export function seedDemoData(): number {
 
   // 등록된 아이가 없으면 데모 아이 자동 등록
   if (children.length === 0) {
-    localStorage.setItem("registered-children", JSON.stringify(DEMO_CHILDREN));
-    children = DEMO_CHILDREN;
+    try { localStorage.setItem("registered-children", JSON.stringify(DEMO_CHILDREN)); } catch {}
+    children = DEMO_CHILDREN.map((c) => ({
+      id: c.id, birthDate: c.birthDate, height: c.height, weight: c.weight, gender: c.gender,
+    }));
   }
 
   // 양육자 등록 및 현재 양육자 → 아빠(이해커톤)
